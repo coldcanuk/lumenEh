@@ -450,7 +450,11 @@ void markyd_editor_set_content(MarkydEditor *self, const gchar *content) {
   }
 
   g_free(self->source_content);
-  self->source_content = g_strdup(content ? content : "");
+  if (content) {
+    self->source_content = g_utf8_make_valid(content, -1);
+  } else {
+    self->source_content = g_strdup("");
+  }
   schedule_markdown_apply(self);
 }
 

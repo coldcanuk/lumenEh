@@ -55,7 +55,7 @@ RemoteSSHLocation *remote_ssh_parse_uri(const gchar *uri) {
       loc->path = g_strdup(path_sep);
     } else {
       user_host_port = g_strdup(p);
-      loc->path = g_strdup("/");
+      loc->path = g_strdup("");
     }
   } else {
     /* SCP format: [user@]host:path */
@@ -241,3 +241,70 @@ gchar *remote_ssh_fetch_image_asset(const RemoteSSHLocation *doc_loc,
   g_free(image_data);
   return cache_path;
 }
+
+gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc, GPtrArray **out_items, GError **error) {
+  GPtrArray *args;
+  gchar *remote_cmd;
+  gchar *stdout_buf = NULL;
+  gchar *stderr_buf = NULL;
+  gint exit_status = 0;
+  GError *spawn_err = NULL;
+
+  if (!loc || !loc->host || !loc->path || !out_items) {
+    if (error) {
+      *error = g_error_new(G_SPAWN_ERROR, G_SPAWN_ERROR_FAILED, "Invalid SSH location arguments");
+    }
+    return FALSE;
+  }
+
+  if (!loc->path || loc->path[0] == '\0') {
+    remote_cmd = g_strdup("/bin/ls -1p");
+  } else {
+    remote_cmd = g_strdup_printf("/bin/ls -1p '%s'", loc->path);
+  }
+
+  args = g_ptr_array_new_with_free_func(g_free);
+  build_ssh_args(loc, args, remote_cmd);
+  g_free(remote_cmd);
+
+  gboolean ok = g_spawn_sync(
+      NULL, (gchar **)args->pdata, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,
+      &stdout_buf, &stderr_buf, &exit_status, &spawn_err);
+
+  g_ptr_array_free(args, TRUE);
+
+  if (!ok || !WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
+    if (error) {
+      if (spawn_err) {
+        *error = spawn_err;
+        spawn_err = NULL;
+      } else {
+        *error = g_error_new(G_SPAWN_ERROR, G_SPAWN_ERROR_FAILED,
+                             "SSH list dir failed: %s",
+                             (stderr_buf && stderr_buf[0]) ? stderr_buf : "unknown");
+      }
+    } else if (spawn_err) {
+      g_error_free(spawn_err);
+    }
+    g_free(stdout_buf);
+    g_free(stderr_buf);
+    return FALSE;
+  }
+  g_free(stderr_buf);
+
+  *out_items = g_ptr_array_new_with_free_func(g_free);
+  if (stdout_buf) {
+    gchar **lines = g_strsplit(stdout_buf, "\n", -1);
+    for (gint i = 0; lines[i] != NULL; i++) {
+      gchar *line = g_strstrip(lines[i]);
+      if (line[0] != '\0') {
+        g_ptr_array_add(*out_items, g_strdup(line));
+      }
+    }
+    g_strfreev(lines);
+  }
+  g_free(stdout_buf);
+
+  return TRUE;
+}
+

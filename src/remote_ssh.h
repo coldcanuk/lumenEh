@@ -32,4 +32,9 @@ gchar *remote_ssh_fetch_image_asset(const RemoteSSHLocation *doc_loc,
                                     const gchar *relative_src,
                                     GError **error);
 
+/* Lists contents of a remote directory over SSH. */
+gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc,
+                             GPtrArray **out_items,
+                             GError **error);
+
 #endif /* VIEWMD_REMOTE_SSH_H */

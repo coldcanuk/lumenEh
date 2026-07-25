@@ -4,6 +4,8 @@
 #include "editor.h"
 #include "markdown.h"
 #include "remote_ssh.h"
+#include "remote_browser.h"
+#include "bookmarks.h"
 
 typedef struct {
   gint start_offset;
@@ -751,7 +753,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
 
   self->scroll = gtk_scrolled_window_new(NULL, NULL);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(self->scroll),
-                                 GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+                                 GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
   gtk_box_pack_start(GTK_BOX(main_box), self->scroll, TRUE, TRUE, 0);
 
   self->editor = markyd_editor_new(app);
@@ -975,62 +977,332 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
   gtk_widget_destroy(dialog);
 }
 
+typedef struct {
+  MarkydWindow *window;
+  GtkWidget *dialog;
+  GtkWidget *entry_user;
+  GtkWidget *entry_host;
+  GtkWidget *entry_port;
+  GtkWidget *entry_path;
+  GtkWidget *btn_connect;
+  GtkWidget *btn_browse;
+  GtkWidget *btn_open;
+  GtkWidget *btn_add_bm;
+  GtkWidget *btn_del_bm;
+  GtkWidget *combo_bookmarks;
+  GtkWidget *lbl_status;
+  gchar *validated_uri;
+} RemoteConnectionUI;
+
+static gchar *build_uri_from_ui(RemoteConnectionUI *ui) {
+  const gchar *u = gtk_entry_get_text(GTK_ENTRY(ui->entry_user));
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  const gchar *po = gtk_entry_get_text(GTK_ENTRY(ui->entry_port));
+  const gchar *pa = gtk_entry_get_text(GTK_ENTRY(ui->entry_path));
+  
+  GString *s = g_string_new("");
+  if (u && u[0] != '\0') g_string_append_printf(s, "%s@", u);
+  g_string_append(s, h);
+  if (po && po[0] != '\0' && g_strcmp0(po, "22") != 0) g_string_append_printf(s, ":%s", po);
+  
+  g_string_append(s, ":");
+  if (pa && pa[0] != '\0') {
+    g_string_append(s, pa);
+  }
+  
+  return g_string_free(s, FALSE);
+}
+
+static void on_remote_host_changed(GtkEditable *editable, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  const gchar *text = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  
+  // If user pasted a full URI into the host field, auto-parse it
+  if (g_str_has_prefix(text, "ssh://") || strchr(text, '@')) {
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(text);
+    if (loc && loc->host) {
+      g_signal_handlers_block_by_func(ui->entry_host, on_remote_host_changed, ui);
+      
+      gtk_entry_set_text(GTK_ENTRY(ui->entry_user), loc->user ? loc->user : "");
+      gtk_entry_set_text(GTK_ENTRY(ui->entry_host), loc->host ? loc->host : "");
+      if (loc->port > 0) {
+        gchar *pstr = g_strdup_printf("%d", loc->port);
+        gtk_entry_set_text(GTK_ENTRY(ui->entry_port), pstr);
+        g_free(pstr);
+      } else {
+        gtk_entry_set_text(GTK_ENTRY(ui->entry_port), "");
+      }
+      gtk_entry_set_text(GTK_ENTRY(ui->entry_path), loc->path ? loc->path : "");
+      
+      g_signal_handlers_unblock_by_func(ui->entry_host, on_remote_host_changed, ui);
+      remote_ssh_location_free(loc);
+    }
+  }
+  
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  gtk_widget_set_sensitive(ui->btn_connect, (h && h[0] != '\0'));
+  
+  // Reset validated state if they change the host
+  gtk_widget_set_sensitive(ui->btn_browse, FALSE);
+  gtk_widget_set_sensitive(ui->btn_open, FALSE);
+  if (ui->btn_add_bm) gtk_widget_set_sensitive(ui->btn_add_bm, FALSE);
+  gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Not connected.");
+}
+
+static void on_remote_connect_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  gtk_widget_set_sensitive(ui->btn_connect, FALSE);
+  gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Testing connection...");
+  
+  while (gtk_events_pending()) gtk_main_iteration();
+  
+  gchar *uri = build_uri_from_ui(ui);
+  RemoteSSHLocation *loc = remote_ssh_parse_uri(uri);
+  
+  GPtrArray *items = NULL;
+  GError *error = NULL;
+  
+  // Test connection
+  if (loc && remote_ssh_list_dir(loc, &items, &error)) {
+    gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Connection established!");
+    gtk_widget_set_sensitive(ui->btn_browse, TRUE);
+    gtk_widget_set_sensitive(ui->btn_open, TRUE);
+    if (ui->btn_add_bm) gtk_widget_set_sensitive(ui->btn_add_bm, TRUE);
+    
+    g_free(ui->validated_uri);
+    ui->validated_uri = g_strdup(uri);
+    
+    if (items) g_ptr_array_free(items, TRUE);
+  } else {
+    gchar *err_msg = g_strdup_printf("Connection failed: %s", error ? error->message : "Unknown error");
+    gtk_label_set_text(GTK_LABEL(ui->lbl_status), err_msg);
+    g_free(err_msg);
+    if (error) g_error_free(error);
+  }
+  
+  if (loc) remote_ssh_location_free(loc);
+  g_free(uri);
+  
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  gtk_widget_set_sensitive(ui->btn_connect, (h && h[0] != '\0'));
+}
+
+static void on_remote_browse_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  if (!ui->validated_uri) return;
+  
+  gtk_widget_hide(ui->dialog);
+  remote_browser_dialog_run(ui->window, ui->validated_uri);
+  
+  if (GTK_IS_WIDGET(ui->dialog)) {
+      gtk_dialog_response(GTK_DIALOG(ui->dialog), GTK_RESPONSE_CANCEL);
+  }
+}
+
+static void on_remote_open_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  if (!ui->validated_uri) return;
+  
+  const gchar *pa = gtk_entry_get_text(GTK_ENTRY(ui->entry_path));
+  if (pa == NULL || pa[0] == '\0' || g_str_has_suffix(pa, "/")) {
+    on_remote_browse_clicked(button, user_data);
+    return;
+  }
+  
+  gtk_dialog_response(GTK_DIALOG(ui->dialog), GTK_RESPONSE_ACCEPT);
+}
+
+static void on_remote_bookmark_del_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  gchar *active_id = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_bookmarks));
+  if (active_id && viewmd_bookmark_remove(active_id)) {
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(ui->combo_bookmarks));
+    GPtrArray *bms = viewmd_bookmarks_get_all();
+    for (guint i = 0; bms && i < bms->len; i++) {
+      ViewmdBookmark *bm = g_ptr_array_index(bms, i);
+      gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_bookmarks), bm->display_name);
+    }
+  }
+  g_free(active_id);
+}
+
+static void on_remote_bookmark_add_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  const gchar *u = gtk_entry_get_text(GTK_ENTRY(ui->entry_user));
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  const gchar *po = gtk_entry_get_text(GTK_ENTRY(ui->entry_port));
+  
+  GString *s = g_string_new("");
+  if (u && u[0] != '\0') g_string_append_printf(s, "%s@", u);
+  g_string_append(s, h);
+  if (po && po[0] != '\0' && g_strcmp0(po, "22") != 0) g_string_append_printf(s, ":%s", po);
+  
+  g_string_append(s, ":");
+  gchar *uri = g_string_free(s, FALSE);
+  
+  gboolean exists = FALSE;
+  GPtrArray *bms = viewmd_bookmarks_get_all();
+  for (guint i = 0; bms && i < bms->len; i++) {
+    ViewmdBookmark *bm = g_ptr_array_index(bms, i);
+    if (g_strcmp0(bm->uri, uri) == 0) {
+      exists = TRUE;
+      break;
+    }
+  }
+  
+  if (!exists) {
+    viewmd_bookmark_add(uri);
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_bookmarks), uri);
+  }
+  
+  g_free(uri);
+}
+
+static void on_remote_bookmark_changed(GtkComboBox *combo, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  gchar *uri = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo));
+  if (uri) {
+    // Treat as if user pasted it into host
+    gtk_entry_set_text(GTK_ENTRY(ui->entry_host), uri);
+    g_free(uri);
+    if (ui->btn_del_bm) gtk_widget_set_sensitive(ui->btn_del_bm, TRUE);
+  } else {
+    if (ui->btn_del_bm) gtk_widget_set_sensitive(ui->btn_del_bm, FALSE);
+  }
+}
+
 static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
   MarkydWindow *self = (MarkydWindow *)user_data;
-  GtkWidget *dialog;
-  GtkWidget *content_area;
-  GtkWidget *label;
-  GtkWidget *entry;
-  gint response;
-
   (void)button;
+  
+  RemoteConnectionUI *ui = g_new0(RemoteConnectionUI, 1);
+  ui->window = self;
 
-  dialog = gtk_dialog_new_with_buttons(
-      "Open Remote SSH Document", GTK_WINDOW(self->window),
+  ui->dialog = gtk_dialog_new_with_buttons(
+      "Connect to Remote Host", GTK_WINDOW(self->window),
       GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-      "_Cancel", GTK_RESPONSE_CANCEL,
-      "_Open", GTK_RESPONSE_ACCEPT, NULL);
+      "_Cancel", GTK_RESPONSE_CANCEL, NULL);
+      
+  gtk_window_set_default_size(GTK_WINDOW(ui->dialog), 500, -1);
 
-  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
-
-  content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(ui->dialog));
   gtk_container_set_border_width(GTK_CONTAINER(content_area), 12);
   gtk_box_set_spacing(GTK_BOX(content_area), 8);
 
-  label = gtk_label_new("Enter Remote SSH Location (e.g. user@host:/path/to/doc.md or ssh://user@host/path):");
-  gtk_label_set_xalign(GTK_LABEL(label), 0.0);
-  gtk_box_pack_start(GTK_BOX(content_area), label, FALSE, FALSE, 0);
+  // Bookmarks
+  GtkWidget *hbox_bm = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_box_pack_start(GTK_BOX(content_area), hbox_bm, FALSE, FALSE, 0);
+  
+  GtkWidget *lbl_bm = gtk_label_new("Bookmarks:");
+  gtk_box_pack_start(GTK_BOX(hbox_bm), lbl_bm, FALSE, FALSE, 0);
+  
+  ui->combo_bookmarks = gtk_combo_box_text_new();
+  GPtrArray *bms = viewmd_bookmarks_get_all();
+  for (guint i = 0; bms && i < bms->len; i++) {
+    ViewmdBookmark *bm = g_ptr_array_index(bms, i);
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_bookmarks), bm->display_name);
+  }
+  g_signal_connect(ui->combo_bookmarks, "changed", G_CALLBACK(on_remote_bookmark_changed), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_bm), ui->combo_bookmarks, TRUE, TRUE, 0);
+  
+  ui->btn_add_bm = gtk_button_new_with_label("Save Bookmark");
+  gtk_widget_set_sensitive(ui->btn_add_bm, FALSE);
+  g_signal_connect(ui->btn_add_bm, "clicked", G_CALLBACK(on_remote_bookmark_add_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_bm), ui->btn_add_bm, FALSE, FALSE, 0);
 
-  entry = gtk_entry_new();
-  gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
-  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "user@hostname:/home/user/docs/readme.md");
-  gtk_box_pack_start(GTK_BOX(content_area), entry, FALSE, FALSE, 0);
+  ui->btn_del_bm = gtk_button_new_with_label("Delete Bookmark");
+  gtk_widget_set_sensitive(ui->btn_del_bm, FALSE);
+  g_signal_connect(ui->btn_del_bm, "clicked", G_CALLBACK(on_remote_bookmark_del_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_bm), ui->btn_del_bm, FALSE, FALSE, 0);
 
+  // Grid for User/Host/Port/Path
+  GtkWidget *grid = gtk_grid_new();
+  gtk_grid_set_row_spacing(GTK_GRID(grid), 6);
+  gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
+  gtk_box_pack_start(GTK_BOX(content_area), grid, FALSE, FALSE, 0);
+
+  // Row 0: User @ Host
+  ui->entry_user = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_user), "user (optional)");
+  gtk_widget_set_hexpand(ui->entry_user, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("User:"), 0, 0, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_user, 1, 0, 1, 1);
+  
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("@ Host:"), 2, 0, 1, 1);
+  ui->entry_host = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_host), "hostname or IP");
+  gtk_widget_set_hexpand(ui->entry_host, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_host, 3, 0, 1, 1);
+  g_signal_connect(ui->entry_host, "changed", G_CALLBACK(on_remote_host_changed), ui);
+
+  // Row 1: Port
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Port:"), 0, 1, 1, 1);
+  ui->entry_port = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_port), "22");
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_port, 1, 1, 1, 1);
+
+  // Row 2: Path
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Path:"), 0, 2, 1, 1);
+  ui->entry_path = gtk_entry_new();
+  gtk_entry_set_text(GTK_ENTRY(ui->entry_path), "");
+  gtk_widget_set_hexpand(ui->entry_path, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_path, 1, 2, 3, 1);
+
+  // Status label
+  ui->lbl_status = gtk_label_new("Not connected.");
+  gtk_label_set_xalign(GTK_LABEL(ui->lbl_status), 0.0);
+  gtk_box_pack_start(GTK_BOX(content_area), ui->lbl_status, FALSE, FALSE, 0);
+
+  // Custom Actions HBox
+  GtkWidget *hbox_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_box_pack_start(GTK_BOX(content_area), hbox_actions, FALSE, FALSE, 0);
+  
+  ui->btn_connect = gtk_button_new_with_label("Connect / Test");
+  gtk_widget_set_sensitive(ui->btn_connect, FALSE);
+  g_signal_connect(ui->btn_connect, "clicked", G_CALLBACK(on_remote_connect_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_connect, FALSE, FALSE, 0);
+  
+  ui->btn_browse = gtk_button_new_with_label("Browse Directory");
+  gtk_widget_set_sensitive(ui->btn_browse, FALSE);
+  g_signal_connect(ui->btn_browse, "clicked", G_CALLBACK(on_remote_browse_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_browse, FALSE, FALSE, 0);
+  
+  ui->btn_open = gtk_button_new_with_label("Open Document");
+  gtk_widget_set_sensitive(ui->btn_open, FALSE);
+  g_signal_connect(ui->btn_open, "clicked", G_CALLBACK(on_remote_open_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_open, FALSE, FALSE, 0);
+  
   const gchar *curr = markyd_app_get_current_path(self->app);
   if (curr && remote_ssh_is_remote_uri(curr)) {
-    gtk_entry_set_text(GTK_ENTRY(entry), curr);
+    gtk_entry_set_text(GTK_ENTRY(ui->entry_host), curr); // Auto-parse
   }
 
-  gtk_widget_show_all(dialog);
-
-  response = gtk_dialog_run(GTK_DIALOG(dialog));
-  if (response == GTK_RESPONSE_ACCEPT) {
-    const gchar *uri = gtk_entry_get_text(GTK_ENTRY(entry));
-    if (uri && uri[0] != '\0') {
-      if (!markyd_app_open_file(self->app, uri)) {
-        GtkWidget *error_dialog = gtk_message_dialog_new(
-            GTK_WINDOW(self->window),
-            GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
-            GTK_BUTTONS_CLOSE, "Failed to open remote SSH document");
-        gtk_message_dialog_format_secondary_text(
-            GTK_MESSAGE_DIALOG(error_dialog), "%s", uri);
-        gtk_dialog_run(GTK_DIALOG(error_dialog));
-        gtk_widget_destroy(error_dialog);
-      }
+  gtk_widget_show_all(ui->dialog);
+  
+  gint response = gtk_dialog_run(GTK_DIALOG(ui->dialog));
+  if (response == GTK_RESPONSE_ACCEPT && ui->validated_uri) {
+    if (!markyd_app_open_file(self->app, ui->validated_uri)) {
+      GtkWidget *error_dialog = gtk_message_dialog_new(
+          GTK_WINDOW(self->window),
+          GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
+          GTK_BUTTONS_CLOSE, "Failed to open remote SSH document");
+      gtk_message_dialog_format_secondary_text(
+          GTK_MESSAGE_DIALOG(error_dialog), "%s", ui->validated_uri);
+      gtk_dialog_run(GTK_DIALOG(error_dialog));
+      if (GTK_IS_WIDGET(error_dialog)) gtk_widget_destroy(error_dialog);
     }
   }
 
-  gtk_widget_destroy(dialog);
+  if (GTK_IS_WIDGET(ui->dialog)) {
+    gtk_widget_destroy(ui->dialog);
+  }
+  g_free(ui->validated_uri);
+  g_free(ui);
 }
 
 static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
