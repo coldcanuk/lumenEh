@@ -46,10 +46,12 @@ uninstall:
 
 # Header dependencies
 $(OBJDIR)/main.o: $(SRCDIR)/app.h $(SRCDIR)/window.h
-$(OBJDIR)/app.o: $(SRCDIR)/app.h $(SRCDIR)/config.h $(SRCDIR)/window.h $(SRCDIR)/editor.h
-$(OBJDIR)/window.o: $(SRCDIR)/window.h $(SRCDIR)/app.h $(SRCDIR)/editor.h $(SRCDIR)/config.h
-$(OBJDIR)/editor.o: $(SRCDIR)/editor.h $(SRCDIR)/markdown.h $(SRCDIR)/app.h
+$(OBJDIR)/app.o: $(SRCDIR)/app.h $(SRCDIR)/config.h $(SRCDIR)/window.h $(SRCDIR)/editor.h $(SRCDIR)/remote_ssh.h
+$(OBJDIR)/window.o: $(SRCDIR)/window.h $(SRCDIR)/app.h $(SRCDIR)/editor.h $(SRCDIR)/config.h $(SRCDIR)/remote_ssh.h
+$(OBJDIR)/editor.o: $(SRCDIR)/editor.h $(SRCDIR)/markdown.h $(SRCDIR)/app.h $(SRCDIR)/remote_ssh.h
 $(OBJDIR)/markdown.o: $(SRCDIR)/markdown.h $(SRCDIR)/code_highlight.h
 $(OBJDIR)/code_highlight.o: $(SRCDIR)/code_highlight.h
 $(OBJDIR)/config.o: $(SRCDIR)/config.h
+$(OBJDIR)/remote_ssh.o: $(SRCDIR)/remote_ssh.h
 $(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.h
+

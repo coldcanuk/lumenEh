@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "app.h"
 #include "markdown.h"
+#include "remote_ssh.h"
 #include <string.h>
 
 static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
@@ -157,6 +158,19 @@ static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
     return FALSE;
   }
 
+  const gchar *current_path = markyd_app_get_current_path(self->app);
+  if (current_path && remote_ssh_is_remote_uri(current_path)) {
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(current_path);
+    if (loc) {
+      gchar *cached_path = remote_ssh_fetch_image_asset(loc, src, NULL);
+      remote_ssh_location_free(loc);
+      if (cached_path) {
+        *out_path = cached_path;
+        return TRUE;
+      }
+    }
+  }
+
   if (g_uri_parse_scheme(src) != NULL) {
     if (g_str_has_prefix(src, "file://")) {
       path = g_filename_from_uri(src, NULL, NULL);
@@ -166,7 +180,6 @@ static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
   } else if (g_path_is_absolute(src)) {
     path = g_strdup(src);
   } else {
-    const gchar *current_path = markyd_app_get_current_path(self->app);
     if (current_path && current_path[0] != '\0') {
       gchar *dir = g_path_get_dirname(current_path);
       path = g_build_filename(dir, src, NULL);
@@ -187,6 +200,7 @@ static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
   *out_path = path;
   return TRUE;
 }
+
 
 static gint get_image_max_width(MarkydEditor *self) {
   GtkAllocation alloc;

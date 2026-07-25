@@ -3,6 +3,7 @@
 #include "config.h"
 #include "editor.h"
 #include "markdown.h"
+#include "remote_ssh.h"
 
 typedef struct {
   gint start_offset;
@@ -16,6 +17,7 @@ typedef struct {
 #define TAG_SEARCH_CURRENT "viewmd_search_current"
 
 static void on_open_clicked(GtkButton *button, gpointer user_data);
+static void on_open_remote_clicked(GtkButton *button, gpointer user_data);
 static void on_refresh_clicked(GtkButton *button, gpointer user_data);
 static void on_settings_clicked(GtkButton *button, gpointer user_data);
 static void on_search_changed(GtkEditable *editable, gpointer user_data);
@@ -674,6 +676,15 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   gtk_widget_set_tooltip_text(self->btn_open, "Open Markdown Document");
   g_signal_connect(self->btn_open, "clicked", G_CALLBACK(on_open_clicked), self);
 
+  self->btn_open_remote =
+      gtk_button_new_from_icon_name("folder-remote-symbolic", GTK_ICON_SIZE_BUTTON);
+  if (!self->btn_open_remote) {
+    self->btn_open_remote =
+        gtk_button_new_from_icon_name("network-server-symbolic", GTK_ICON_SIZE_BUTTON);
+  }
+  gtk_widget_set_tooltip_text(self->btn_open_remote, "Open Remote Location (SSH)");
+  g_signal_connect(self->btn_open_remote, "clicked", G_CALLBACK(on_open_remote_clicked), self);
+
   self->btn_refresh =
       gtk_button_new_from_icon_name("view-refresh-symbolic", GTK_ICON_SIZE_BUTTON);
   gtk_widget_set_tooltip_text(self->btn_refresh, "Reload Current Document");
@@ -688,6 +699,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
 
   left_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_open, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_open_remote, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_refresh, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_settings, FALSE, FALSE, 0);
   gtk_header_bar_pack_start(GTK_HEADER_BAR(self->header_bar), left_buttons);
@@ -957,6 +969,64 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
         gtk_widget_destroy(error_dialog);
       }
       g_free(path);
+    }
+  }
+
+  gtk_widget_destroy(dialog);
+}
+
+static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
+  MarkydWindow *self = (MarkydWindow *)user_data;
+  GtkWidget *dialog;
+  GtkWidget *content_area;
+  GtkWidget *label;
+  GtkWidget *entry;
+  gint response;
+
+  (void)button;
+
+  dialog = gtk_dialog_new_with_buttons(
+      "Open Remote SSH Document", GTK_WINDOW(self->window),
+      GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+      "_Cancel", GTK_RESPONSE_CANCEL,
+      "_Open", GTK_RESPONSE_ACCEPT, NULL);
+
+  gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
+
+  content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  gtk_container_set_border_width(GTK_CONTAINER(content_area), 12);
+  gtk_box_set_spacing(GTK_BOX(content_area), 8);
+
+  label = gtk_label_new("Enter Remote SSH Location (e.g. user@host:/path/to/doc.md or ssh://user@host/path):");
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+  gtk_box_pack_start(GTK_BOX(content_area), label, FALSE, FALSE, 0);
+
+  entry = gtk_entry_new();
+  gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
+  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "user@hostname:/home/user/docs/readme.md");
+  gtk_box_pack_start(GTK_BOX(content_area), entry, FALSE, FALSE, 0);
+
+  const gchar *curr = markyd_app_get_current_path(self->app);
+  if (curr && remote_ssh_is_remote_uri(curr)) {
+    gtk_entry_set_text(GTK_ENTRY(entry), curr);
+  }
+
+  gtk_widget_show_all(dialog);
+
+  response = gtk_dialog_run(GTK_DIALOG(dialog));
+  if (response == GTK_RESPONSE_ACCEPT) {
+    const gchar *uri = gtk_entry_get_text(GTK_ENTRY(entry));
+    if (uri && uri[0] != '\0') {
+      if (!markyd_app_open_file(self->app, uri)) {
+        GtkWidget *error_dialog = gtk_message_dialog_new(
+            GTK_WINDOW(self->window),
+            GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
+            GTK_BUTTONS_CLOSE, "Failed to open remote SSH document");
+        gtk_message_dialog_format_secondary_text(
+            GTK_MESSAGE_DIALOG(error_dialog), "%s", uri);
+        gtk_dialog_run(GTK_DIALOG(error_dialog));
+        gtk_widget_destroy(error_dialog);
+      }
     }
   }
 

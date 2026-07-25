@@ -1,6 +1,7 @@
 #include "app.h"
 #include "config.h"
 #include "editor.h"
+#include "remote_ssh.h"
 #include "window.h"
 
 /* Global app instance */
@@ -68,9 +69,25 @@ static void markyd_app_update_window_title(MarkydApp *self) {
   }
 
   if (self->current_file_path && self->current_file_path[0] != '\0') {
-    gchar *base = g_path_get_basename(self->current_file_path);
-    title = g_strdup_printf("ViewMD - %s", base);
-    g_free(base);
+    if (remote_ssh_is_remote_uri(self->current_file_path)) {
+      RemoteSSHLocation *loc = remote_ssh_parse_uri(self->current_file_path);
+      if (loc) {
+        gchar *base = g_path_get_basename(loc->path);
+        if (loc->user && loc->user[0] != '\0') {
+          title = g_strdup_printf("ViewMD - %s [%s@%s]", base, loc->user, loc->host);
+        } else {
+          title = g_strdup_printf("ViewMD - %s [%s]", base, loc->host);
+        }
+        g_free(base);
+        remote_ssh_location_free(loc);
+      } else {
+        title = g_strdup_printf("ViewMD - %s", self->current_file_path);
+      }
+    } else {
+      gchar *base = g_path_get_basename(self->current_file_path);
+      title = g_strdup_printf("ViewMD - %s", base);
+      g_free(base);
+    }
   } else {
     title = g_strdup("ViewMD");
   }
@@ -138,6 +155,30 @@ gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
     return FALSE;
   }
 
+  if (remote_ssh_is_remote_uri(path)) {
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(path);
+    if (loc) {
+      if (remote_ssh_fetch_file(loc, &content, NULL, &error)) {
+        markyd_editor_set_content(self->editor, content);
+        g_free(content);
+
+        g_free(self->current_file_path);
+        self->current_file_path = g_strdup(path);
+
+        markyd_app_update_window_title(self);
+        remote_ssh_location_free(loc);
+        return TRUE;
+      }
+      remote_ssh_location_free(loc);
+    }
+    if (error) {
+      g_printerr("Failed to load remote markdown document '%s': %s\n", path,
+                 error->message);
+      g_error_free(error);
+    }
+    return FALSE;
+  }
+
   if (!g_file_get_contents(path, &content, NULL, &error)) {
     if (error) {
       g_printerr("Failed to load markdown file '%s': %s\n", path, error->message);
@@ -162,3 +203,4 @@ const gchar *markyd_app_get_current_path(MarkydApp *self) {
   }
   return self->current_file_path;
 }
+
