@@ -811,6 +811,38 @@ void markyd_window_apply_css(MarkydWindow *self) {
     search_match_fg = "#f4f4e8";
     search_current_bg = "#66551f";
     search_current_fg = "#f4f4e8";
+  } else if (g_strcmp0(config->theme, "solarized-light") == 0) {
+    bg = "#fdf6e3";
+    fg = "#657b83";
+    sel_bg = "#eee8d5";
+    search_match_bg = "#b58900";
+    search_match_fg = "#fdf6e3";
+    search_current_bg = "#cb4b16";
+    search_current_fg = "#fdf6e3";
+  } else if (g_strcmp0(config->theme, "solarized-dark") == 0) {
+    bg = "#002b36";
+    fg = "#839496";
+    sel_bg = "#073642";
+    search_match_bg = "#b58900";
+    search_match_fg = "#002b36";
+    search_current_bg = "#cb4b16";
+    search_current_fg = "#002b36";
+  } else if (g_strcmp0(config->theme, "dracula") == 0) {
+    bg = "#282a36";
+    fg = "#f8f8f2";
+    sel_bg = "#44475a";
+    search_match_bg = "#f1fa8c";
+    search_match_fg = "#282a36";
+    search_current_bg = "#ffb86c";
+    search_current_fg = "#282a36";
+  } else if (g_strcmp0(config->theme, "nord") == 0) {
+    bg = "#2e3440";
+    fg = "#d8dee9";
+    sel_bg = "#4c566a";
+    search_match_bg = "#ebcb8b";
+    search_match_fg = "#2e3440";
+    search_current_bg = "#d08770";
+    search_current_fg = "#2e3440";
   } else {
     bg = "@theme_base_color";
     fg = "@theme_text_color";
@@ -1486,10 +1518,70 @@ static void on_font_family_changed(GtkComboBoxText *combo, gpointer user_data) {
   config->font_family = gtk_combo_box_text_get_active_text(combo);
 }
 
+typedef struct {
+  GtkWidget *h1;
+  GtkWidget *h2;
+  GtkWidget *h3;
+  GtkWidget *bullet;
+} ThemeColorBtns;
+
+static void update_theme_colors(void) {
+  const gchar *h1 = NULL, *h2 = NULL, *h3 = NULL, *bullet = NULL;
+
+  if (g_strcmp0(config->theme, "light") == 0) {
+    h1 = "#D02C35"; h2 = "#0366D6"; h3 = "#28A745"; bullet = "#0366D6";
+  } else if (g_strcmp0(config->theme, "dark") == 0) {
+    h1 = "#E06C75"; h2 = "#61AFEF"; h3 = "#98C379"; bullet = "#61AFEF";
+  } else if (g_strcmp0(config->theme, "solarized-light") == 0) {
+    h1 = "#DC322F"; h2 = "#268BD2"; h3 = "#859900"; bullet = "#B58900";
+  } else if (g_strcmp0(config->theme, "solarized-dark") == 0) {
+    h1 = "#DC322F"; h2 = "#268BD2"; h3 = "#859900"; bullet = "#B58900";
+  } else if (g_strcmp0(config->theme, "dracula") == 0) {
+    h1 = "#FF79C6"; h2 = "#8BE9FD"; h3 = "#50FA7B"; bullet = "#BD93F9";
+  } else if (g_strcmp0(config->theme, "nord") == 0) {
+    h1 = "#BF616A"; h2 = "#88C0D0"; h3 = "#A3BE8C"; bullet = "#81A1C1";
+  } else {
+    h1 = "#61AFEF"; h2 = "#C678DD"; h3 = "#E5C07B"; bullet = "#61AFEF";
+  }
+
+  if (h1) {
+    g_free(config->h1_color);
+    config->h1_color = g_strdup(h1);
+  }
+  if (h2) {
+    g_free(config->h2_color);
+    config->h2_color = g_strdup(h2);
+  }
+  if (h3) {
+    g_free(config->h3_color);
+    config->h3_color = g_strdup(h3);
+  }
+  if (bullet) {
+    g_free(config->list_bullet_color);
+    config->list_bullet_color = g_strdup(bullet);
+  }
+}
+
+static void init_color_button(GtkColorButton *btn, const gchar *color_str) {
+  GdkRGBA rgba;
+  if (color_str && gdk_rgba_parse(&rgba, color_str)) {
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(btn), &rgba);
+  }
+}
+
 static void on_theme_changed(GtkComboBoxText *combo, gpointer user_data) {
-  (void)user_data;
+  ThemeColorBtns *btns = (ThemeColorBtns *)user_data;
   g_free(config->theme);
   config->theme = gtk_combo_box_text_get_active_text(combo);
+  
+  update_theme_colors();
+
+  if (btns) {
+    init_color_button(GTK_COLOR_BUTTON(btns->h1), config->h1_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->h2), config->h2_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->h3), config->h3_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->bullet), config->list_bullet_color);
+  }
 }
 
 static gchar *rgba_to_hex(const GdkRGBA *rgba) {
@@ -1499,12 +1591,7 @@ static gchar *rgba_to_hex(const GdkRGBA *rgba) {
   return g_strdup_printf("#%02X%02X%02X", r, g, b);
 }
 
-static void init_color_button(GtkColorButton *btn, const gchar *color_str) {
-  GdkRGBA rgba;
-  if (color_str && gdk_rgba_parse(&rgba, color_str)) {
-    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(btn), &rgba);
-  }
-}
+
 
 static void on_color_set(GtkColorButton *btn, gpointer user_data) {
   gchar **target = (gchar **)user_data;
@@ -1550,18 +1637,22 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
   gtk_grid_attach(GTK_GRID(grid), label, 0, row, 1, 1);
 
   theme_combo = gtk_combo_box_text_new();
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "dark");
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "light");
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "system");
+  const gchar *themes[] = {"dark", "light", "solarized-light", "solarized-dark", "dracula", "nord", "system", NULL};
+  
+  gint active_idx = 0; // Default to dark
+  for (gint i = 0; themes[i] != NULL; i++) {
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), themes[i]);
+    if (g_strcmp0(config->theme, themes[i]) == 0) {
+      active_idx = i;
+    }
+  }
+  
+  gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), active_idx);
 
-  if (g_strcmp0(config->theme, "light") == 0)
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 1);
-  else if (g_strcmp0(config->theme, "system") == 0)
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 2);
-  else
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 0);
+  ThemeColorBtns *btns = g_new0(ThemeColorBtns, 1);
+  g_object_set_data_full(G_OBJECT(dialog), "theme-btns", btns, g_free);
 
-  g_signal_connect(theme_combo, "changed", G_CALLBACK(on_theme_changed), NULL);
+  g_signal_connect(theme_combo, "changed", G_CALLBACK(on_theme_changed), btns);
   gtk_widget_set_hexpand(theme_combo, TRUE);
   gtk_grid_attach(GTK_GRID(grid), theme_combo, 1, row++, 1, 1);
 
@@ -1656,6 +1747,11 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
   g_signal_connect(bullet_color_btn, "color-set", G_CALLBACK(on_color_set),
                    &config->list_bullet_color);
   gtk_grid_attach(GTK_GRID(grid), bullet_color_btn, 1, row++, 1, 1);
+
+  btns->h1 = h1_color_btn;
+  btns->h2 = h2_color_btn;
+  btns->h3 = h3_color_btn;
+  btns->bullet = bullet_color_btn;
 
   gtk_widget_show_all(dialog);
 

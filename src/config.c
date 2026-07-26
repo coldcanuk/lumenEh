@@ -23,10 +23,10 @@ MarkydConfig *config_new(void) {
   cfg->font_size = 16;
   cfg->theme = g_strdup("dark");
 
-  /* Markdown accent defaults (match previous hardcoded colors) */
-  cfg->h1_color = g_strdup("#61AFEF");
-  cfg->h2_color = g_strdup("#C678DD");
-  cfg->h3_color = g_strdup("#E5C07B");
+  /* Markdown accent defaults */
+  cfg->h1_color = g_strdup("#E06C75");
+  cfg->h2_color = g_strdup("#61AFEF");
+  cfg->h3_color = g_strdup("#98C379");
   cfg->list_bullet_color = g_strdup("#61AFEF");
 
   cfg->line_numbers = FALSE;
