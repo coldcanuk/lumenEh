@@ -25,11 +25,12 @@ static void load_directory(RemoteBrowserData *data, const gchar *path) {
   GError *error = NULL;
   GtkTreeIter iter;
 
+  gchar *new_path_str = g_strdup(path ? path : "");
   if (data->current_loc->path) {
     g_free(data->current_loc->path);
   }
-  data->current_loc->path = g_strdup(path);
-  gtk_entry_set_text(GTK_ENTRY(data->path_entry), path);
+  data->current_loc->path = new_path_str;
+  gtk_entry_set_text(GTK_ENTRY(data->path_entry), new_path_str);
   gtk_label_set_text(GTK_LABEL(data->status_label), "Loading...");
 
   // Update UI first
@@ -40,7 +41,7 @@ static void load_directory(RemoteBrowserData *data, const gchar *path) {
   gtk_list_store_clear(data->list_store);
 
   // Add ".." parent directory if not at root
-  if (g_strcmp0(path, "/") != 0 && strlen(path) > 1) {
+  if (g_strcmp0(new_path_str, "/") != 0 && strlen(new_path_str) > 1) {
     gtk_list_store_append(data->list_store, &iter);
     gtk_list_store_set(data->list_store, &iter, 
                        COL_ICON, "go-up-symbolic",

@@ -144,8 +144,8 @@ gboolean remote_ssh_fetch_file(const RemoteSSHLocation *loc,
     *out_len = 0;
   }
 
-  /* Construct command e.g. cat '/remote/path' */
-  remote_cmd = g_strdup_printf("cat '%s'", loc->path);
+  /* Construct command with delimiters and base64 encoding to ignore bashrc noise */
+  remote_cmd = g_strdup_printf("echo '===VIEWMD_START==='; base64 '%s'; echo '===VIEWMD_END==='", loc->path);
 
   args = g_ptr_array_new_with_free_func(g_free);
   build_ssh_args(loc, args, remote_cmd);
@@ -181,12 +181,39 @@ gboolean remote_ssh_fetch_file(const RemoteSSHLocation *loc,
   }
 
   g_free(stderr_buf);
-  length = stdout_buf ? strlen(stdout_buf) : 0;
-  *out_content = stdout_buf;
-  if (out_len) {
-    *out_len = length;
+  
+  if (stdout_buf) {
+    gchar *start_marker = g_strstr_len(stdout_buf, -1, "===VIEWMD_START===\n");
+    gchar *end_marker = g_strstr_len(stdout_buf, -1, "===VIEWMD_END===");
+    
+    if (start_marker && end_marker && end_marker > start_marker) {
+      gsize prefix_len = strlen("===VIEWMD_START===\n");
+      gchar *base64_data = g_strndup(start_marker + prefix_len, end_marker - (start_marker + prefix_len));
+      
+      gsize decoded_len = 0;
+      guchar *decoded = g_base64_decode(base64_data, &decoded_len);
+      g_free(base64_data);
+      
+      // We must append a null terminator just in case it's treated as a string (like Markdown text)
+      // g_base64_decode returns a buffer allocated by g_malloc, but we should make sure it's null-terminated for text.
+      // Wait, g_base64_decode does NOT guarantee null-termination! We should manually add it for safety if it's text.
+      gchar *final_buf = g_malloc(decoded_len + 1);
+      if (decoded_len > 0) memcpy(final_buf, decoded, decoded_len);
+      final_buf[decoded_len] = '\0';
+      g_free(decoded);
+      
+      *out_content = final_buf;
+      if (out_len) *out_len = decoded_len;
+      g_free(stdout_buf);
+      return TRUE;
+    }
   }
-  return TRUE;
+
+  if (error) {
+    *error = g_error_new(G_SPAWN_ERROR, G_SPAWN_ERROR_FAILED, "Failed to parse remote file stream (missing delimiters)");
+  }
+  g_free(stdout_buf);
+  return FALSE;
 }
 
 gchar *remote_ssh_fetch_image_asset(const RemoteSSHLocation *doc_loc,
@@ -258,9 +285,9 @@ gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc, GPtrArray **out_items
   }
 
   if (!loc->path || loc->path[0] == '\0') {
-    remote_cmd = g_strdup("/bin/ls -1p");
+    remote_cmd = g_strdup("echo '---VIEWMD_START---' && /bin/ls -1p && echo '---VIEWMD_END---'");
   } else {
-    remote_cmd = g_strdup_printf("/bin/ls -1p '%s'", loc->path);
+    remote_cmd = g_strdup_printf("echo '---VIEWMD_START---' && /bin/ls -1p '%s' && echo '---VIEWMD_END---'", loc->path);
   }
 
   args = g_ptr_array_new_with_free_func(g_free);
@@ -295,9 +322,17 @@ gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc, GPtrArray **out_items
   *out_items = g_ptr_array_new_with_free_func(g_free);
   if (stdout_buf) {
     gchar **lines = g_strsplit(stdout_buf, "\n", -1);
+    gboolean in_data = FALSE;
     for (gint i = 0; lines[i] != NULL; i++) {
       gchar *line = g_strstrip(lines[i]);
-      if (line[0] != '\0') {
+      if (g_strcmp0(line, "---VIEWMD_START---") == 0) {
+        in_data = TRUE;
+        continue;
+      }
+      if (g_strcmp0(line, "---VIEWMD_END---") == 0) {
+        break;
+      }
+      if (in_data && line[0] != '\0') {
         g_ptr_array_add(*out_items, g_strdup(line));
       }
     }
