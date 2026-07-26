@@ -753,7 +753,9 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
 
   self->scroll = gtk_scrolled_window_new(NULL, NULL);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(self->scroll),
-                                 GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
+                                 GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_min_content_width(GTK_SCROLLED_WINDOW(self->scroll), 100);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(self->scroll), 100);
   gtk_box_pack_start(GTK_BOX(main_box), self->scroll, TRUE, TRUE, 0);
 
   self->editor = markyd_editor_new(app);
