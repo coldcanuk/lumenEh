@@ -4,7 +4,9 @@ Native GTK 3 markdown viewer for local **and** remote (SSH) files — with real 
 
 **lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton (MIT). Combined work is **GPL-3.0-or-later**; see [License & provenance](#license--provenance) and [`NOTICE`](NOTICE).
 
-Uses [md4c](https://github.com/mity/md4c) for markdown parsing. ![lumenEh](assets/screenshot.png)
+Uses [md4c](https://github.com/mity/md4c) for markdown parsing.
+
+![lumenEh](assets/screenshot.png)
 
 ## Features
 
