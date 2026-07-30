@@ -1,6 +1,10 @@
-# ViewMD
+# lumenEh
 
-A lightweight GTK 3 markdown viewer for desktop Linux. It is ideal as your default app for opening `.md` files. Uses the excellent library [md4c](https://github.com/mity/md4c) for markdown parsing. This project is sort of a companion app/fork of my other markdown project [TrayMD](https://github.com/rabfulton/TrayMD). 
+Native GTK 3 markdown viewer for local **and** remote (SSH) files — with real theme control.
+
+**lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton (MIT). Combined work is **GPL-3.0-or-later**; see [License & provenance](#license--provenance) and [`NOTICE`](NOTICE).
+
+Uses [md4c](https://github.com/mity/md4c) for markdown parsing. Binary/package names may still say `viewmd` until the branding pass.
 
 ![ViewMD](assets/screenshot.png)
 
@@ -146,9 +150,6 @@ sudo dnf install gtk3-devel
 - Arch: `packaging/arch/PKGBUILD`
 - Debian: `packaging/deb/control.in`
 - RPM: `packaging/rpm/viewmd.spec.in`
-## License
-
-MIT License
 
 ## Other Useful Projects
 - TrayMD is an app for taking notes in markdown with live editing [TrayMD](https://github.com/rabfulton/TrayMD)
@@ -164,5 +165,6 @@ MIT License
 
 - Combined work: **GPL-3.0-or-later** (see [`LICENSE`](LICENSE))
 - Upstream ViewMD and vendored **md4c** retain their MIT terms as documented in [`NOTICE`](NOTICE)
+- Packaging license fields: GPL-3.0-or-later (package *names* may still say `viewmd` until the branding pass)
 
 Binary and package names may still say `viewmd` until the branding pass.
