@@ -1,6 +1,4 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -O2 -g `pkg-config --cflags gtk+-3.0`
-LDFLAGS = `pkg-config --libs gtk+-3.0`
+include config.mk
 
 SRCDIR = src
 OBJDIR = obj
@@ -10,12 +8,7 @@ SOURCES = $(wildcard $(SRCDIR)/*.c)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/md4c.o
 TARGET = $(BINDIR)/viewmd
 
-PREFIX ?= /usr/local
 DESTDIR ?=
-
-bindir ?= $(PREFIX)/bin
-datadir ?= $(PREFIX)/share
-applicationsdir ?= $(datadir)/applications
 
 .PHONY: all clean install uninstall
 
@@ -24,10 +17,10 @@ all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c Makefile config.mk | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.c | $(OBJDIR)
+$(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.c Makefile config.mk | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR):
@@ -46,10 +39,12 @@ uninstall:
 
 # Header dependencies
 $(OBJDIR)/main.o: $(SRCDIR)/app.h $(SRCDIR)/window.h
-$(OBJDIR)/app.o: $(SRCDIR)/app.h $(SRCDIR)/config.h $(SRCDIR)/window.h $(SRCDIR)/editor.h
-$(OBJDIR)/window.o: $(SRCDIR)/window.h $(SRCDIR)/app.h $(SRCDIR)/editor.h $(SRCDIR)/config.h
-$(OBJDIR)/editor.o: $(SRCDIR)/editor.h $(SRCDIR)/markdown.h $(SRCDIR)/app.h
+$(OBJDIR)/app.o: $(SRCDIR)/app.h $(SRCDIR)/config.h $(SRCDIR)/window.h $(SRCDIR)/editor.h $(SRCDIR)/remote_ssh.h
+$(OBJDIR)/window.o: $(SRCDIR)/window.h $(SRCDIR)/app.h $(SRCDIR)/editor.h $(SRCDIR)/config.h $(SRCDIR)/remote_ssh.h
+$(OBJDIR)/editor.o: $(SRCDIR)/editor.h $(SRCDIR)/markdown.h $(SRCDIR)/app.h $(SRCDIR)/remote_ssh.h
 $(OBJDIR)/markdown.o: $(SRCDIR)/markdown.h $(SRCDIR)/code_highlight.h
 $(OBJDIR)/code_highlight.o: $(SRCDIR)/code_highlight.h
 $(OBJDIR)/config.o: $(SRCDIR)/config.h
+$(OBJDIR)/remote_ssh.o: $(SRCDIR)/remote_ssh.h
 $(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.h
+

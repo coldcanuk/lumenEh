@@ -1,6 +1,10 @@
-# ViewMD
+# lumenEh
 
-A lightweight GTK 3 markdown viewer for desktop Linux. It is ideal as your default app for opening `.md` files. Uses the excellent library [md4c](https://github.com/mity/md4c) for markdown parsing. This project is sort of a companion app/fork of my other markdown project [TrayMD](https://github.com/rabfulton/TrayMD). 
+Native GTK 3 markdown viewer for local **and** remote (SSH) files — with real theme control.
+
+**lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton (MIT). Combined work is **GPL-3.0-or-later**; see [License & provenance](#license--provenance) and [`NOTICE`](NOTICE).
+
+Uses [md4c](https://github.com/mity/md4c) for markdown parsing. Binary/package names may still say `viewmd` until the branding pass.
 
 ![ViewMD](assets/screenshot.png)
 
@@ -9,6 +13,7 @@ A lightweight GTK 3 markdown viewer for desktop Linux. It is ideal as your defau
 - **Native GTK viewer** - No webviews
 - **Read-only rendering** - Focused on viewing markdown files
 - **Minimal UI** - Clean toolbar with open and settings buttons
+- **Tabbed interface** - Open multiple documents at once with an intuitive empty state
 - **Lightweight** - Pure C, no web technologies, fast startup
 - **Hyperlink support** - Left click opens links and internal anchors
 - **Document search** - `Ctrl+F` with next/previous match navigation
@@ -64,6 +69,19 @@ Run `viewmd` to start the application.
 - **Reload button**: Reload the currently open document from disk
 - **Settings button**: Adjust theme, fonts, and markdown accent colors
 
+### Remote SSH File Manager
+
+ViewMD can natively browse and open Markdown files hosted on remote servers over SSH.
+
+- Click the **Open Remote (SSH)** button in the header bar.
+- Enter an SSH URI (e.g., `ssh://user@hostname/path/to/docs` or `user@hostname:/path/to/docs`).
+- Use the **Browse** button to navigate the remote filesystem and select documents.
+- Use the **Save Host** and **Delete Host** buttons to manage frequently accessed remote servers without saving credentials.
+- Bookmark specific files or directories directly from the file browser using the **Bookmark Path** button, which nested them under your saved hosts.
+- Select a host to dynamically load its saved paths.
+
+> **Important**: This feature executes the system `ssh` command. For the best user experience and seamless background loading, it is highly recommended to configure **SSH keys** and `ssh-agent`. Password prompts will cause the fetch to fail because the subprocess runs in batch mode (`-o BatchMode=yes`).
+
 ### Find in Document
 
 - Press `Ctrl+F` to open search.
@@ -96,6 +114,7 @@ xdg-open README.md
 ## Building From Source
 
 ```bash
+./configure
 make
 sudo make install
 ```
@@ -131,9 +150,6 @@ sudo dnf install gtk3-devel
 - Arch: `packaging/arch/PKGBUILD`
 - Debian: `packaging/deb/control.in`
 - RPM: `packaging/rpm/viewmd.spec.in`
-## License
-
-MIT License
 
 ## Other Useful Projects
 - TrayMD is an app for taking notes in markdown with live editing [TrayMD](https://github.com/rabfulton/TrayMD)
@@ -142,3 +158,13 @@ MIT License
 - For a feature complete AI application try out [ChatGTK](https://github.com/rabfulton/ChatGTK)
 - A lightweight speech to text implementation [Auriscribe](https://github.com/rabfulton/Auriscribe)
 - A lightweight local movie database and browser [ReelVault](https://github.com/rabfulton/ReelVault)
+
+## License & provenance
+
+**lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton and contributors.
+
+- Combined work: **GPL-3.0-or-later** (see [`LICENSE`](LICENSE))
+- Upstream ViewMD and vendored **md4c** retain their MIT terms as documented in [`NOTICE`](NOTICE)
+- Packaging license fields: GPL-3.0-or-later (package *names* may still say `viewmd` until the branding pass)
+
+Binary and package names may still say `viewmd` until the branding pass.

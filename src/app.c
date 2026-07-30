@@ -1,6 +1,7 @@
 #include "app.h"
 #include "config.h"
 #include "editor.h"
+#include "remote_ssh.h"
 #include "window.h"
 
 /* Global app instance */
@@ -9,7 +10,6 @@ MarkydApp *app = NULL;
 static void on_activate(GtkApplication *gtk_app, gpointer user_data);
 static void on_open(GtkApplication *gtk_app, GFile **files, gint n_files,
                     const gchar *hint, gpointer user_data);
-static void markyd_app_update_window_title(MarkydApp *self);
 static void markyd_app_ensure_window(MarkydApp *self);
 
 MarkydApp *markyd_app_new(void) {
@@ -28,7 +28,6 @@ MarkydApp *markyd_app_new(void) {
                               G_APPLICATION_HANDLES_OPEN);
 
   self->gtk_app = gtk_application_new("org.viewmd.app", flags);
-  self->current_file_path = NULL;
 
   g_signal_connect(self->gtk_app, "activate", G_CALLBACK(on_activate), self);
   g_signal_connect(self->gtk_app, "open", G_CALLBACK(on_open), self);
@@ -45,7 +44,6 @@ void markyd_app_free(MarkydApp *self) {
     markyd_window_free(self->window);
   }
 
-  g_free(self->current_file_path);
   g_object_unref(self->gtk_app);
 
   config_save(config);
@@ -58,25 +56,6 @@ void markyd_app_free(MarkydApp *self) {
 
 int markyd_app_run(MarkydApp *self, int argc, char **argv) {
   return g_application_run(G_APPLICATION(self->gtk_app), argc, argv);
-}
-
-static void markyd_app_update_window_title(MarkydApp *self) {
-  gchar *title;
-
-  if (!self || !self->window || !self->window->window) {
-    return;
-  }
-
-  if (self->current_file_path && self->current_file_path[0] != '\0') {
-    gchar *base = g_path_get_basename(self->current_file_path);
-    title = g_strdup_printf("ViewMD - %s", base);
-    g_free(base);
-  } else {
-    title = g_strdup("ViewMD");
-  }
-
-  gtk_window_set_title(GTK_WINDOW(self->window->window), title);
-  g_free(title);
 }
 
 static void on_activate(GtkApplication *gtk_app, gpointer user_data) {
@@ -123,18 +102,34 @@ static void markyd_app_ensure_window(MarkydApp *self) {
   }
 
   self->window = markyd_window_new(self);
-  self->editor = self->window->editor;
 
-  markyd_editor_set_content(self->editor,
-                            "# ViewMD\n\nUse the Open button to load a markdown document.");
-  markyd_app_update_window_title(self);
+  markyd_window_open_tab(self->window, NULL, "# ViewMD\n\nUse the Open button to load a markdown document.");
 }
 
 gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
   gchar *content = NULL;
   GError *error = NULL;
 
-  if (!self || !self->editor || !path || path[0] == '\0') {
+  if (!self || !self->window || !path || path[0] == '\0') {
+    return FALSE;
+  }
+
+  if (remote_ssh_is_remote_uri(path)) {
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(path);
+    if (loc) {
+      if (remote_ssh_fetch_file(loc, &content, NULL, &error)) {
+        markyd_window_open_tab(self->window, path, content);
+        g_free(content);
+        remote_ssh_location_free(loc);
+        return TRUE;
+      }
+      remote_ssh_location_free(loc);
+    }
+    if (error) {
+      g_printerr("Failed to load remote markdown document '%s': %s\n", path,
+                 error->message);
+      g_error_free(error);
+    }
     return FALSE;
   }
 
@@ -146,19 +141,15 @@ gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
     return FALSE;
   }
 
-  markyd_editor_set_content(self->editor, content);
+  markyd_window_open_tab(self->window, path, content);
   g_free(content);
 
-  g_free(self->current_file_path);
-  self->current_file_path = g_strdup(path);
-
-  markyd_app_update_window_title(self);
   return TRUE;
 }
 
 const gchar *markyd_app_get_current_path(MarkydApp *self) {
-  if (!self) {
-    return NULL;
+  if (self && self->window) {
+    return markyd_window_get_current_path(self->window);
   }
-  return self->current_file_path;
+  return NULL;
 }

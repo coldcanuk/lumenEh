@@ -1342,6 +1342,8 @@ void markdown_init_tags(GtkTextBuffer *buffer) {
                              config->h1_color, NULL);
   gtk_text_buffer_create_tag(buffer, TAG_TABLE_SEPARATOR, "family", "Monospace",
                              "foreground", "#5C6370", NULL);
+
+  markdown_update_accent_tags(buffer);
 }
 
 void markdown_update_accent_tags(GtkTextBuffer *buffer) {
@@ -1393,6 +1395,77 @@ void markdown_update_accent_tags(GtkTextBuffer *buffer) {
   if (tag) {
     g_object_set(tag, "foreground", config->h1_color, NULL);
   }
+
+  const gchar *code_fg = "#E06C75";
+  const gchar *code_bg = "#3E4451";
+  const gchar *block_fg = "#ABB2BF";
+  const gchar *block_bg = "#2C313A";
+  const gchar *quote_fg = "#5C6370";
+  const gchar *quote_bg = "#2C313A";
+  const gchar *link_fg = "#61AFEF";
+
+  if (g_strcmp0(config->theme, "light") == 0) {
+    code_fg = "#D02C35";
+    code_bg = "#F0F0F0";
+    block_fg = "#333333";
+    block_bg = "#F6F8FA";
+    quote_fg = "#6A737D";
+    quote_bg = "#F6F8FA";
+    link_fg = "#0366D6";
+  } else if (g_strcmp0(config->theme, "solarized-light") == 0) {
+    code_fg = "#DC322F";
+    code_bg = "#EEE8D5";
+    block_fg = "#657B83";
+    block_bg = "#FDF6E3";
+    quote_fg = "#93A1A1";
+    quote_bg = "#EEE8D5";
+    link_fg = "#268BD2";
+  } else if (g_strcmp0(config->theme, "solarized-dark") == 0) {
+    code_fg = "#DC322F";
+    code_bg = "#073642";
+    block_fg = "#839496";
+    block_bg = "#002B36";
+    quote_fg = "#586E75";
+    quote_bg = "#073642";
+    link_fg = "#268BD2";
+  } else if (g_strcmp0(config->theme, "dracula") == 0) {
+    code_fg = "#FF79C6";
+    code_bg = "#44475A";
+    block_fg = "#F8F8F2";
+    block_bg = "#282A36";
+    quote_fg = "#6272A4";
+    quote_bg = "#44475A";
+    link_fg = "#8BE9FD";
+  } else if (g_strcmp0(config->theme, "nord") == 0) {
+    code_fg = "#BF616A";
+    code_bg = "#4C566A";
+    block_fg = "#D8DEE9";
+    block_bg = "#2E3440";
+    quote_fg = "#4C566A";
+    quote_bg = "#3B4252";
+    link_fg = "#88C0D0";
+  }
+
+  tag = gtk_text_tag_table_lookup(table, TAG_CODE);
+  if (tag) g_object_set(tag, "foreground", code_fg, "background", code_bg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_CODE_BLOCK);
+  if (tag) g_object_set(tag, "foreground", block_fg, "paragraph-background", block_bg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_QUOTE);
+  if (tag) g_object_set(tag, "foreground", quote_fg, "paragraph-background", quote_bg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_LINK);
+  if (tag) g_object_set(tag, "foreground", link_fg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_HRULE);
+  if (tag) g_object_set(tag, "foreground", quote_fg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_TABLE);
+  if (tag) g_object_set(tag, "paragraph-background", block_bg, NULL);
+
+  tag = gtk_text_tag_table_lookup(table, TAG_TABLE_SEPARATOR);
+  if (tag) g_object_set(tag, "foreground", quote_fg, NULL);
 }
 
 static gfloat align_to_xalign(MD_ALIGN align) {

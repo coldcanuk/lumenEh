@@ -3,6 +3,9 @@
 #include "config.h"
 #include "editor.h"
 #include "markdown.h"
+#include "remote_ssh.h"
+#include "remote_browser.h"
+#include "bookmarks.h"
 
 typedef struct {
   gint start_offset;
@@ -16,6 +19,7 @@ typedef struct {
 #define TAG_SEARCH_CURRENT "viewmd_search_current"
 
 static void on_open_clicked(GtkButton *button, gpointer user_data);
+static void on_open_remote_clicked(GtkButton *button, gpointer user_data);
 static void on_refresh_clicked(GtkButton *button, gpointer user_data);
 static void on_settings_clicked(GtkButton *button, gpointer user_data);
 static void on_search_changed(GtkEditable *editable, gpointer user_data);
@@ -54,6 +58,7 @@ static gboolean on_configure_event(GtkWidget *widget, GdkEventConfigure *event,
 static gboolean on_window_state_event(GtkWidget *widget,
                                       GdkEventWindowState *event,
                                       gpointer user_data);
+static void on_notebook_switch_page(GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer user_data);
 
 static void on_font_size_changed(GtkSpinButton *spin, gpointer user_data);
 static void on_font_family_changed(GtkComboBoxText *combo, gpointer user_data);
@@ -182,7 +187,8 @@ static gboolean scroll_to_table_cell(MarkydWindow *self, GtkWidget *cell) {
   GtkAdjustment *hadj;
   GtkAdjustment *vadj;
 
-  if (!self || !cell || !self->editor || !self->editor->text_view || !self->scroll) {
+  GtkWidget *current_scroll = self->current_tab ? self->current_tab->scroll : NULL;
+  if (!self || !cell || !self->editor || !self->editor->text_view || !current_scroll) {
     return FALSE;
   }
 
@@ -192,8 +198,8 @@ static gboolean scroll_to_table_cell(MarkydWindow *self, GtkWidget *cell) {
   }
 
   gtk_widget_get_allocation(cell, &alloc);
-  hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(self->scroll));
-  vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self->scroll));
+  hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(current_scroll));
+  vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(current_scroll));
   doc_x = x + (hadj ? gtk_adjustment_get_value(hadj) : 0.0);
   doc_y = y + (vadj ? gtk_adjustment_get_value(vadj) : 0.0);
 
@@ -624,6 +630,15 @@ static void on_editor_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) 
   update_search_matches(self);
 }
 
+static void on_window_destroy(GtkWidget *widget, gpointer user_data) {
+  (void)widget;
+  MarkydWindow *self = (MarkydWindow *)user_data;
+  if (self) {
+    self->window = NULL;
+  }
+  gtk_main_quit();
+}
+
 MarkydWindow *markyd_window_new(MarkydApp *app) {
   MarkydWindow *self = g_new0(MarkydWindow, 1);
   GtkWidget *left_buttons;
@@ -653,6 +668,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
     gtk_window_maximize(GTK_WINDOW(self->window));
   }
 
+  g_signal_connect(self->window, "destroy", G_CALLBACK(on_window_destroy), self);
   g_signal_connect(self->window, "key-press-event",
                    G_CALLBACK(on_key_press_event), self);
   g_signal_connect(self->window, "configure-event",
@@ -674,6 +690,15 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   gtk_widget_set_tooltip_text(self->btn_open, "Open Markdown Document");
   g_signal_connect(self->btn_open, "clicked", G_CALLBACK(on_open_clicked), self);
 
+  self->btn_open_remote =
+      gtk_button_new_from_icon_name("folder-remote-symbolic", GTK_ICON_SIZE_BUTTON);
+  if (!self->btn_open_remote) {
+    self->btn_open_remote =
+        gtk_button_new_from_icon_name("network-server-symbolic", GTK_ICON_SIZE_BUTTON);
+  }
+  gtk_widget_set_tooltip_text(self->btn_open_remote, "Open Remote Location (SSH)");
+  g_signal_connect(self->btn_open_remote, "clicked", G_CALLBACK(on_open_remote_clicked), self);
+
   self->btn_refresh =
       gtk_button_new_from_icon_name("view-refresh-symbolic", GTK_ICON_SIZE_BUTTON);
   gtk_widget_set_tooltip_text(self->btn_refresh, "Reload Current Document");
@@ -688,6 +713,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
 
   left_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_open, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_open_remote, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_refresh, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(left_buttons), self->btn_settings, FALSE, FALSE, 0);
   gtk_header_bar_pack_start(GTK_HEADER_BAR(self->header_bar), left_buttons);
@@ -737,23 +763,34 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   gtk_widget_set_halign(self->lbl_search_status, GTK_ALIGN_END);
   gtk_box_pack_start(GTK_BOX(search_box), self->lbl_search_status, FALSE, FALSE, 0);
 
-  self->scroll = gtk_scrolled_window_new(NULL, NULL);
-  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(self->scroll),
-                                 GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-  gtk_box_pack_start(GTK_BOX(main_box), self->scroll, TRUE, TRUE, 0);
+  self->notebook = gtk_notebook_new();
+  gtk_notebook_set_scrollable(GTK_NOTEBOOK(self->notebook), TRUE);
+  gtk_notebook_set_show_border(GTK_NOTEBOOK(self->notebook), FALSE);
+  g_signal_connect(self->notebook, "switch-page", G_CALLBACK(on_notebook_switch_page), self);
+  gtk_box_pack_start(GTK_BOX(main_box), self->notebook, TRUE, TRUE, 0);
 
-  self->editor = markyd_editor_new(app);
-  gtk_container_add(GTK_CONTAINER(self->scroll),
-                    markyd_editor_get_widget(self->editor));
+  self->empty_state_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_valign(self->empty_state_box, GTK_ALIGN_CENTER);
+  gtk_widget_set_halign(self->empty_state_box, GTK_ALIGN_CENTER);
+  GtkWidget *empty_label = gtk_label_new("No documents open");
+  PangoAttrList *attrs = pango_attr_list_new();
+  pango_attr_list_insert(attrs, pango_attr_scale_new(1.5));
+  pango_attr_list_insert(attrs, pango_attr_foreground_new(30000, 30000, 30000));
+  gtk_label_set_attributes(GTK_LABEL(empty_label), attrs);
+  pango_attr_list_unref(attrs);
+  gtk_box_pack_start(GTK_BOX(self->empty_state_box), empty_label, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(main_box), self->empty_state_box, TRUE, TRUE, 0);
+
+  self->tabs = NULL;
+  self->current_tab = NULL;
+  self->editor = NULL;
   self->search_matches = g_array_new(FALSE, FALSE, sizeof(SearchMatch));
   self->search_current_index = -1;
-  g_signal_connect(self->editor->buffer, "changed",
-                   G_CALLBACK(on_editor_buffer_changed), self);
-  ensure_search_tags(self);
 
   markyd_window_apply_css(self);
 
   gtk_widget_show_all(self->window);
+  gtk_widget_hide(self->notebook);
 
   return self;
 }
@@ -797,6 +834,38 @@ void markyd_window_apply_css(MarkydWindow *self) {
     search_match_fg = "#f4f4e8";
     search_current_bg = "#66551f";
     search_current_fg = "#f4f4e8";
+  } else if (g_strcmp0(config->theme, "solarized-light") == 0) {
+    bg = "#fdf6e3";
+    fg = "#657b83";
+    sel_bg = "#eee8d5";
+    search_match_bg = "#b58900";
+    search_match_fg = "#fdf6e3";
+    search_current_bg = "#cb4b16";
+    search_current_fg = "#fdf6e3";
+  } else if (g_strcmp0(config->theme, "solarized-dark") == 0) {
+    bg = "#002b36";
+    fg = "#839496";
+    sel_bg = "#073642";
+    search_match_bg = "#b58900";
+    search_match_fg = "#002b36";
+    search_current_bg = "#cb4b16";
+    search_current_fg = "#002b36";
+  } else if (g_strcmp0(config->theme, "dracula") == 0) {
+    bg = "#282a36";
+    fg = "#f8f8f2";
+    sel_bg = "#44475a";
+    search_match_bg = "#f1fa8c";
+    search_match_fg = "#282a36";
+    search_current_bg = "#ffb86c";
+    search_current_fg = "#282a36";
+  } else if (g_strcmp0(config->theme, "nord") == 0) {
+    bg = "#2e3440";
+    fg = "#d8dee9";
+    sel_bg = "#4c566a";
+    search_match_bg = "#ebcb8b";
+    search_match_fg = "#2e3440";
+    search_current_bg = "#d08770";
+    search_current_fg = "#2e3440";
   } else {
     bg = "@theme_base_color";
     fg = "@theme_text_color";
@@ -885,9 +954,19 @@ void markyd_window_free(MarkydWindow *self) {
     self->search_matches = NULL;
   }
 
-  if (self->editor) {
-    markyd_editor_free(self->editor);
+  GList *l = self->tabs;
+  while (l != NULL) {
+    GList *next = l->next;
+    MarkydTab *tab = (MarkydTab *)l->data;
+    if (tab->editor) {
+      markyd_editor_free(tab->editor);
+    }
+    g_free(tab->file_path);
+    g_free(tab);
+    l = next;
   }
+  g_list_free(self->tabs);
+  self->tabs = NULL;
 
   if (self->window) {
     gtk_widget_destroy(self->window);
@@ -961,6 +1040,400 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
   }
 
   gtk_widget_destroy(dialog);
+}
+
+typedef struct {
+  MarkydWindow *window;
+  GtkWidget *dialog;
+  GtkWidget *entry_user;
+  GtkWidget *entry_host;
+  GtkWidget *entry_port;
+  GtkWidget *entry_path;
+  GtkWidget *btn_connect;
+  GtkWidget *btn_browse;
+  GtkWidget *btn_open;
+  
+  GtkWidget *combo_hosts;
+  GtkWidget *btn_add_host;
+  GtkWidget *btn_del_host;
+  
+  GtkWidget *combo_paths;
+  GtkWidget *btn_del_path;
+
+  GtkWidget *lbl_status;
+  gchar *validated_uri;
+} RemoteConnectionUI;
+
+static gchar *build_uri_from_ui(RemoteConnectionUI *ui) {
+  const gchar *u = gtk_entry_get_text(GTK_ENTRY(ui->entry_user));
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  const gchar *po = gtk_entry_get_text(GTK_ENTRY(ui->entry_port));
+  const gchar *pa = gtk_entry_get_text(GTK_ENTRY(ui->entry_path));
+  
+  GString *s = g_string_new("");
+  if (u && u[0] != '\0') g_string_append_printf(s, "%s@", u);
+  g_string_append(s, h);
+  if (po && po[0] != '\0' && g_strcmp0(po, "22") != 0) g_string_append_printf(s, ":%s", po);
+  
+  g_string_append(s, ":");
+  if (pa && pa[0] != '\0') {
+    g_string_append(s, pa);
+  }
+  
+  return g_string_free(s, FALSE);
+}
+
+
+
+static void on_remote_connect_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  gtk_widget_set_sensitive(ui->btn_connect, FALSE);
+  gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Testing connection...");
+  
+  while (gtk_events_pending()) gtk_main_iteration();
+  
+  gchar *uri = build_uri_from_ui(ui);
+  RemoteSSHLocation *loc = remote_ssh_parse_uri(uri);
+  
+  GPtrArray *items = NULL;
+  GError *error = NULL;
+  
+  // Test connection
+  if (loc && remote_ssh_list_dir(loc, &items, &error)) {
+    gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Connection established!");
+    gtk_widget_set_sensitive(ui->btn_browse, TRUE);
+    gtk_widget_set_sensitive(ui->btn_open, TRUE);
+    if (ui->btn_add_host) gtk_widget_set_sensitive(ui->btn_add_host, TRUE);
+    
+    g_free(ui->validated_uri);
+    ui->validated_uri = g_strdup(uri);
+    
+    if (items) g_ptr_array_free(items, TRUE);
+  } else {
+    gchar *err_msg = g_strdup_printf("Connection failed: %s", error ? error->message : "Unknown error");
+    gtk_label_set_text(GTK_LABEL(ui->lbl_status), err_msg);
+    g_free(err_msg);
+    if (error) g_error_free(error);
+  }
+  
+  if (loc) remote_ssh_location_free(loc);
+  g_free(uri);
+  
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  gtk_widget_set_sensitive(ui->btn_connect, (h && h[0] != '\0'));
+}
+
+static void on_remote_browse_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  if (!ui->validated_uri) return;
+  
+  gtk_widget_hide(ui->dialog);
+  remote_browser_dialog_run(ui->window, ui->validated_uri);
+  
+  if (GTK_IS_WIDGET(ui->dialog)) {
+      gtk_dialog_response(GTK_DIALOG(ui->dialog), GTK_RESPONSE_CANCEL);
+  }
+}
+
+static void on_remote_open_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  if (!ui->validated_uri) return;
+  
+  const gchar *pa = gtk_entry_get_text(GTK_ENTRY(ui->entry_path));
+  if (pa == NULL || pa[0] == '\0' || g_str_has_suffix(pa, "/")) {
+    on_remote_browse_clicked(button, user_data);
+    return;
+  }
+  
+  gtk_dialog_response(GTK_DIALOG(ui->dialog), GTK_RESPONSE_ACCEPT);
+}
+
+static void update_paths_combo(RemoteConnectionUI *ui, const gchar *host_uri) {
+  gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(ui->combo_paths));
+  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_paths), ""); // empty choice
+  if (!host_uri) return;
+  ViewmdBookmarkHost *h = viewmd_bookmark_host_get(host_uri);
+  if (h && h->paths) {
+    for (guint i = 0; i < h->paths->len; i++) {
+      gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_paths), g_ptr_array_index(h->paths, i));
+    }
+  }
+}
+
+static void on_remote_host_del_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  gchar *active_id = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts));
+  if (active_id && viewmd_bookmark_host_remove(active_id)) {
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(ui->combo_hosts));
+    GPtrArray *bms = viewmd_bookmarks_get_hosts();
+    for (guint i = 0; bms && i < bms->len; i++) {
+      ViewmdBookmarkHost *bm = g_ptr_array_index(bms, i);
+      gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), bm->host_uri);
+    }
+    update_paths_combo(ui, NULL);
+  }
+  g_free(active_id);
+}
+
+static void on_remote_host_add_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  const gchar *u = gtk_entry_get_text(GTK_ENTRY(ui->entry_user));
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  const gchar *po = gtk_entry_get_text(GTK_ENTRY(ui->entry_port));
+  
+  GString *s = g_string_new("ssh://");
+  if (u && u[0] != '\0') g_string_append_printf(s, "%s@", u);
+  g_string_append(s, h);
+  if (po && po[0] != '\0' && g_strcmp0(po, "22") != 0) g_string_append_printf(s, ":%s", po);
+  
+  gchar *uri = g_string_free(s, FALSE);
+  
+  gboolean exists = FALSE;
+  GPtrArray *bms = viewmd_bookmarks_get_hosts();
+  for (guint i = 0; bms && i < bms->len; i++) {
+    ViewmdBookmarkHost *bm = g_ptr_array_index(bms, i);
+    if (g_strcmp0(bm->host_uri, uri) == 0) {
+      exists = TRUE;
+      break;
+    }
+  }
+  
+  if (!exists) {
+    viewmd_bookmark_host_add(uri, uri);
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), uri);
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(ui->combo_hosts), uri);
+  }
+  
+  g_free(uri);
+}
+
+static void on_remote_host_changed(GtkComboBox *combo, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  gchar *uri = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo));
+  if (uri) {
+    // We should parse this URI back into user/host/port.
+    // For simplicity, we can use remote_ssh_parse_uri and populate fields.
+    gchar *full_uri_to_parse = g_strdup_printf("%s:", uri);
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(full_uri_to_parse);
+    if (loc) {
+      if (loc->user) gtk_entry_set_text(GTK_ENTRY(ui->entry_user), loc->user);
+      else gtk_entry_set_text(GTK_ENTRY(ui->entry_user), "");
+      if (loc->host) gtk_entry_set_text(GTK_ENTRY(ui->entry_host), loc->host);
+      if (loc->port > 0 && loc->port != 22) {
+        gchar *pstr = g_strdup_printf("%d", loc->port);
+        gtk_entry_set_text(GTK_ENTRY(ui->entry_port), pstr);
+        g_free(pstr);
+      } else {
+        gtk_entry_set_text(GTK_ENTRY(ui->entry_port), "");
+      }
+      remote_ssh_location_free(loc);
+    }
+    g_free(full_uri_to_parse);
+
+    if (ui->btn_del_host) gtk_widget_set_sensitive(ui->btn_del_host, TRUE);
+    update_paths_combo(ui, uri);
+    g_free(uri);
+  } else {
+    if (ui->btn_del_host) gtk_widget_set_sensitive(ui->btn_del_host, FALSE);
+    update_paths_combo(ui, NULL);
+  }
+}
+
+static void on_remote_path_changed(GtkComboBox *combo, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  gchar *path = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo));
+  if (path) {
+    gtk_entry_set_text(GTK_ENTRY(ui->entry_path), path);
+    if (ui->btn_del_path && path[0] != '\0') gtk_widget_set_sensitive(ui->btn_del_path, TRUE);
+    g_free(path);
+  } else {
+    if (ui->btn_del_path) gtk_widget_set_sensitive(ui->btn_del_path, FALSE);
+  }
+}
+
+static void on_remote_path_del_clicked(GtkButton *button, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)button;
+  gchar *host_uri = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts));
+  gchar *path = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_paths));
+  
+  if (host_uri && path && path[0] != '\0') {
+    if (viewmd_bookmark_path_remove(host_uri, path)) {
+      update_paths_combo(ui, host_uri);
+    }
+  }
+  
+  if (host_uri) g_free(host_uri);
+  if (path) g_free(path);
+}
+
+// NOTE: Rename the old on_remote_host_changed from entry signal, so it doesn't conflict
+static void on_remote_host_entry_changed(GtkEditable *editable, gpointer user_data) {
+  RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
+  (void)editable;
+  
+  gchar *uri = build_uri_from_ui(ui);
+  if (uri && ui->validated_uri && g_strcmp0(uri, ui->validated_uri) != 0) {
+    g_free(ui->validated_uri);
+    ui->validated_uri = NULL;
+    gtk_label_set_text(GTK_LABEL(ui->lbl_status), "Not connected.");
+    gtk_widget_set_sensitive(ui->btn_browse, FALSE);
+    gtk_widget_set_sensitive(ui->btn_open, FALSE);
+  }
+  g_free(uri);
+  
+  const gchar *h = gtk_entry_get_text(GTK_ENTRY(ui->entry_host));
+  gtk_widget_set_sensitive(ui->btn_connect, (h && h[0] != '\0'));
+  if (ui->btn_add_host) gtk_widget_set_sensitive(ui->btn_add_host, (h && h[0] != '\0'));
+}
+
+static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
+  MarkydWindow *self = (MarkydWindow *)user_data;
+  (void)button;
+  
+  RemoteConnectionUI *ui = g_new0(RemoteConnectionUI, 1);
+  ui->window = self;
+
+  ui->dialog = gtk_dialog_new_with_buttons(
+      "Connect to Remote Host", GTK_WINDOW(self->window),
+      GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+      "_Cancel", GTK_RESPONSE_CANCEL, NULL);
+      
+  gtk_window_set_default_size(GTK_WINDOW(ui->dialog), 500, -1);
+
+  GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(ui->dialog));
+  gtk_container_set_border_width(GTK_CONTAINER(content_area), 12);
+  gtk_box_set_spacing(GTK_BOX(content_area), 8);
+
+  // Host Bookmarks
+  GtkWidget *hbox_host = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_box_pack_start(GTK_BOX(content_area), hbox_host, FALSE, FALSE, 0);
+  
+  GtkWidget *lbl_host = gtk_label_new("Saved Hosts:");
+  gtk_box_pack_start(GTK_BOX(hbox_host), lbl_host, FALSE, FALSE, 0);
+  
+  ui->combo_hosts = gtk_combo_box_text_new();
+  GPtrArray *hosts = viewmd_bookmarks_get_hosts();
+  for (guint i = 0; hosts && i < hosts->len; i++) {
+    ViewmdBookmarkHost *h = g_ptr_array_index(hosts, i);
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), h->host_uri);
+  }
+  g_signal_connect(ui->combo_hosts, "changed", G_CALLBACK(on_remote_host_changed), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_host), ui->combo_hosts, TRUE, TRUE, 0);
+  
+  ui->btn_add_host = gtk_button_new_with_label("Save Host");
+  gtk_widget_set_sensitive(ui->btn_add_host, FALSE);
+  g_signal_connect(ui->btn_add_host, "clicked", G_CALLBACK(on_remote_host_add_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_host), ui->btn_add_host, FALSE, FALSE, 0);
+
+  ui->btn_del_host = gtk_button_new_with_label("Delete Host");
+  gtk_widget_set_sensitive(ui->btn_del_host, FALSE);
+  g_signal_connect(ui->btn_del_host, "clicked", G_CALLBACK(on_remote_host_del_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_host), ui->btn_del_host, FALSE, FALSE, 0);
+
+  // Grid for User/Host/Port/Path
+  GtkWidget *grid = gtk_grid_new();
+  gtk_grid_set_row_spacing(GTK_GRID(grid), 6);
+  gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
+  gtk_box_pack_start(GTK_BOX(content_area), grid, FALSE, FALSE, 0);
+
+  // Row 0: User @ Host
+  ui->entry_user = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_user), "user (optional)");
+  gtk_widget_set_hexpand(ui->entry_user, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("User:"), 0, 0, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_user, 1, 0, 1, 1);
+  
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("@ Host:"), 2, 0, 1, 1);
+  ui->entry_host = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_host), "hostname or IP");
+  gtk_widget_set_hexpand(ui->entry_host, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_host, 3, 0, 1, 1);
+  g_signal_connect(ui->entry_host, "changed", G_CALLBACK(on_remote_host_entry_changed), ui);
+
+  // Row 1: Port
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Port:"), 0, 1, 1, 1);
+  ui->entry_port = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(ui->entry_port), "22");
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_port, 1, 1, 1, 1);
+
+  // Row 2: Path
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Path:"), 0, 2, 1, 1);
+  ui->entry_path = gtk_entry_new();
+  gtk_entry_set_text(GTK_ENTRY(ui->entry_path), "");
+  gtk_widget_set_hexpand(ui->entry_path, TRUE);
+  gtk_grid_attach(GTK_GRID(grid), ui->entry_path, 1, 2, 3, 1);
+
+  // Path Bookmarks
+  GtkWidget *hbox_path_bm = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Saved Paths:"), 0, 3, 1, 1);
+  gtk_grid_attach(GTK_GRID(grid), hbox_path_bm, 1, 3, 3, 1);
+  
+  ui->combo_paths = gtk_combo_box_text_new();
+  g_signal_connect(ui->combo_paths, "changed", G_CALLBACK(on_remote_path_changed), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_path_bm), ui->combo_paths, TRUE, TRUE, 0);
+  
+  ui->btn_del_path = gtk_button_new_with_label("Delete Path");
+  gtk_widget_set_sensitive(ui->btn_del_path, FALSE);
+  g_signal_connect(ui->btn_del_path, "clicked", G_CALLBACK(on_remote_path_del_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_path_bm), ui->btn_del_path, FALSE, FALSE, 0);
+
+
+  // Status label
+  ui->lbl_status = gtk_label_new("Not connected.");
+  gtk_label_set_xalign(GTK_LABEL(ui->lbl_status), 0.0);
+  gtk_box_pack_start(GTK_BOX(content_area), ui->lbl_status, FALSE, FALSE, 0);
+
+  // Custom Actions HBox
+  GtkWidget *hbox_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_box_pack_start(GTK_BOX(content_area), hbox_actions, FALSE, FALSE, 0);
+  
+  ui->btn_connect = gtk_button_new_with_label("Connect / Test");
+  gtk_widget_set_sensitive(ui->btn_connect, FALSE);
+  g_signal_connect(ui->btn_connect, "clicked", G_CALLBACK(on_remote_connect_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_connect, FALSE, FALSE, 0);
+  
+  ui->btn_browse = gtk_button_new_with_label("Browse Directory");
+  gtk_widget_set_sensitive(ui->btn_browse, FALSE);
+  g_signal_connect(ui->btn_browse, "clicked", G_CALLBACK(on_remote_browse_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_browse, FALSE, FALSE, 0);
+  
+  ui->btn_open = gtk_button_new_with_label("Open Document");
+  gtk_widget_set_sensitive(ui->btn_open, FALSE);
+  g_signal_connect(ui->btn_open, "clicked", G_CALLBACK(on_remote_open_clicked), ui);
+  gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_open, FALSE, FALSE, 0);
+  
+  const gchar *curr = markyd_app_get_current_path(self->app);
+  if (curr && remote_ssh_is_remote_uri(curr)) {
+    gtk_entry_set_text(GTK_ENTRY(ui->entry_host), curr); // Auto-parse
+  }
+
+  gtk_widget_show_all(ui->dialog);
+  
+  gint response = gtk_dialog_run(GTK_DIALOG(ui->dialog));
+  if (response == GTK_RESPONSE_ACCEPT && ui->validated_uri) {
+    if (!markyd_app_open_file(self->app, ui->validated_uri)) {
+      GtkWidget *error_dialog = gtk_message_dialog_new(
+          GTK_WINDOW(self->window),
+          GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
+          GTK_BUTTONS_CLOSE, "Failed to open remote SSH document");
+      gtk_message_dialog_format_secondary_text(
+          GTK_MESSAGE_DIALOG(error_dialog), "%s", ui->validated_uri);
+      gtk_dialog_run(GTK_DIALOG(error_dialog));
+      if (GTK_IS_WIDGET(error_dialog)) gtk_widget_destroy(error_dialog);
+    }
+  }
+
+  if (GTK_IS_WIDGET(ui->dialog)) {
+    gtk_widget_destroy(ui->dialog);
+  }
+  g_free(ui->validated_uri);
+  g_free(ui);
 }
 
 static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
@@ -1046,9 +1519,10 @@ static gboolean on_key_press_event(GtkWidget *widget, GdkEventKey *event,
       gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(self->editor->text_view), &start,
                                    0.0, FALSE, 0.0, 0.0);
 
-      if (self->scroll) {
-        hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(self->scroll));
-        vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self->scroll));
+      GtkWidget *current_scroll = self->current_tab ? self->current_tab->scroll : NULL;
+      if (current_scroll) {
+        hadj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(current_scroll));
+        vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(current_scroll));
       }
       if (hadj) {
         gtk_adjustment_set_value(hadj, gtk_adjustment_get_lower(hadj));
@@ -1144,10 +1618,70 @@ static void on_font_family_changed(GtkComboBoxText *combo, gpointer user_data) {
   config->font_family = gtk_combo_box_text_get_active_text(combo);
 }
 
+typedef struct {
+  GtkWidget *h1;
+  GtkWidget *h2;
+  GtkWidget *h3;
+  GtkWidget *bullet;
+} ThemeColorBtns;
+
+static void update_theme_colors(void) {
+  const gchar *h1 = NULL, *h2 = NULL, *h3 = NULL, *bullet = NULL;
+
+  if (g_strcmp0(config->theme, "light") == 0) {
+    h1 = "#D02C35"; h2 = "#0366D6"; h3 = "#28A745"; bullet = "#0366D6";
+  } else if (g_strcmp0(config->theme, "dark") == 0) {
+    h1 = "#E06C75"; h2 = "#61AFEF"; h3 = "#98C379"; bullet = "#61AFEF";
+  } else if (g_strcmp0(config->theme, "solarized-light") == 0) {
+    h1 = "#DC322F"; h2 = "#268BD2"; h3 = "#859900"; bullet = "#B58900";
+  } else if (g_strcmp0(config->theme, "solarized-dark") == 0) {
+    h1 = "#DC322F"; h2 = "#268BD2"; h3 = "#859900"; bullet = "#B58900";
+  } else if (g_strcmp0(config->theme, "dracula") == 0) {
+    h1 = "#FF79C6"; h2 = "#8BE9FD"; h3 = "#50FA7B"; bullet = "#BD93F9";
+  } else if (g_strcmp0(config->theme, "nord") == 0) {
+    h1 = "#BF616A"; h2 = "#88C0D0"; h3 = "#A3BE8C"; bullet = "#81A1C1";
+  } else {
+    h1 = "#61AFEF"; h2 = "#C678DD"; h3 = "#E5C07B"; bullet = "#61AFEF";
+  }
+
+  if (h1) {
+    g_free(config->h1_color);
+    config->h1_color = g_strdup(h1);
+  }
+  if (h2) {
+    g_free(config->h2_color);
+    config->h2_color = g_strdup(h2);
+  }
+  if (h3) {
+    g_free(config->h3_color);
+    config->h3_color = g_strdup(h3);
+  }
+  if (bullet) {
+    g_free(config->list_bullet_color);
+    config->list_bullet_color = g_strdup(bullet);
+  }
+}
+
+static void init_color_button(GtkColorButton *btn, const gchar *color_str) {
+  GdkRGBA rgba;
+  if (color_str && gdk_rgba_parse(&rgba, color_str)) {
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(btn), &rgba);
+  }
+}
+
 static void on_theme_changed(GtkComboBoxText *combo, gpointer user_data) {
-  (void)user_data;
+  ThemeColorBtns *btns = (ThemeColorBtns *)user_data;
   g_free(config->theme);
   config->theme = gtk_combo_box_text_get_active_text(combo);
+  
+  update_theme_colors();
+
+  if (btns) {
+    init_color_button(GTK_COLOR_BUTTON(btns->h1), config->h1_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->h2), config->h2_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->h3), config->h3_color);
+    init_color_button(GTK_COLOR_BUTTON(btns->bullet), config->list_bullet_color);
+  }
 }
 
 static gchar *rgba_to_hex(const GdkRGBA *rgba) {
@@ -1157,12 +1691,7 @@ static gchar *rgba_to_hex(const GdkRGBA *rgba) {
   return g_strdup_printf("#%02X%02X%02X", r, g, b);
 }
 
-static void init_color_button(GtkColorButton *btn, const gchar *color_str) {
-  GdkRGBA rgba;
-  if (color_str && gdk_rgba_parse(&rgba, color_str)) {
-    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(btn), &rgba);
-  }
-}
+
 
 static void on_color_set(GtkColorButton *btn, gpointer user_data) {
   gchar **target = (gchar **)user_data;
@@ -1208,18 +1737,22 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
   gtk_grid_attach(GTK_GRID(grid), label, 0, row, 1, 1);
 
   theme_combo = gtk_combo_box_text_new();
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "dark");
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "light");
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), "system");
+  const gchar *themes[] = {"dark", "light", "solarized-light", "solarized-dark", "dracula", "nord", "system", NULL};
+  
+  gint active_idx = 0; // Default to dark
+  for (gint i = 0; themes[i] != NULL; i++) {
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(theme_combo), themes[i]);
+    if (g_strcmp0(config->theme, themes[i]) == 0) {
+      active_idx = i;
+    }
+  }
+  
+  gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), active_idx);
 
-  if (g_strcmp0(config->theme, "light") == 0)
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 1);
-  else if (g_strcmp0(config->theme, "system") == 0)
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 2);
-  else
-    gtk_combo_box_set_active(GTK_COMBO_BOX(theme_combo), 0);
+  ThemeColorBtns *btns = g_new0(ThemeColorBtns, 1);
+  g_object_set_data_full(G_OBJECT(dialog), "theme-btns", btns, g_free);
 
-  g_signal_connect(theme_combo, "changed", G_CALLBACK(on_theme_changed), NULL);
+  g_signal_connect(theme_combo, "changed", G_CALLBACK(on_theme_changed), btns);
   gtk_widget_set_hexpand(theme_combo, TRUE);
   gtk_grid_attach(GTK_GRID(grid), theme_combo, 1, row++, 1, 1);
 
@@ -1315,7 +1848,186 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
                    &config->list_bullet_color);
   gtk_grid_attach(GTK_GRID(grid), bullet_color_btn, 1, row++, 1, 1);
 
+  btns->h1 = h1_color_btn;
+  btns->h2 = h2_color_btn;
+  btns->h3 = h3_color_btn;
+  btns->bullet = bullet_color_btn;
+
   gtk_widget_show_all(dialog);
 
   return dialog;
+}
+
+static void update_window_title_for_tab(MarkydWindow *self) {
+  gchar *title;
+  if (!self || !self->window) return;
+  
+  if (!self->current_tab || !self->current_tab->file_path || self->current_tab->file_path[0] == '\0') {
+    gtk_window_set_title(GTK_WINDOW(self->window), "ViewMD");
+    gtk_label_set_text(GTK_LABEL(self->lbl_title), "ViewMD");
+    return;
+  }
+
+  const gchar *path = self->current_tab->file_path;
+  if (remote_ssh_is_remote_uri(path)) {
+    RemoteSSHLocation *loc = remote_ssh_parse_uri(path);
+    if (loc) {
+      gchar *base = g_path_get_basename(loc->path);
+      if (loc->user && loc->user[0] != '\0') {
+        title = g_strdup_printf("ViewMD - %s [%s@%s]", base, loc->user, loc->host);
+      } else {
+        title = g_strdup_printf("ViewMD - %s [%s]", base, loc->host);
+      }
+      g_free(base);
+      remote_ssh_location_free(loc);
+    } else {
+      title = g_strdup_printf("ViewMD - %s", path);
+    }
+  } else {
+    gchar *base = g_path_get_basename(path);
+    title = g_strdup_printf("ViewMD - %s", base);
+    g_free(base);
+  }
+
+  gtk_window_set_title(GTK_WINDOW(self->window), title);
+  gtk_label_set_text(GTK_LABEL(self->lbl_title), title);
+  g_free(title);
+}
+
+static void on_notebook_switch_page(GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer user_data) {
+  MarkydWindow *self = (MarkydWindow *)user_data;
+  (void)notebook;
+  (void)page_num;
+  
+  // Find the tab corresponding to this scroll page
+  GList *l;
+  self->current_tab = NULL;
+  self->editor = NULL;
+  
+  for (l = self->tabs; l != NULL; l = l->next) {
+    MarkydTab *t = (MarkydTab *)l->data;
+    if (t->scroll == page) {
+      self->current_tab = t;
+      self->editor = t->editor;
+      break;
+    }
+  }
+  
+  update_window_title_for_tab(self);
+  
+  // Refresh search matches for new editor
+  if (self->editor) {
+    if (gtk_revealer_get_reveal_child(GTK_REVEALER(self->search_revealer))) {
+      update_search_matches(self);
+    }
+  }
+}
+
+static void on_tab_close_clicked(GtkButton *button, gpointer user_data) {
+  MarkydTab *tab = (MarkydTab *)g_object_get_data(G_OBJECT(button), "tab-ref");
+  MarkydWindow *self = (MarkydWindow *)user_data;
+  if (tab && self) {
+    markyd_window_close_tab(self, tab);
+  }
+}
+
+MarkydTab *markyd_window_open_tab(MarkydWindow *self, const gchar *path, const gchar *content) {
+  if (!self) return NULL;
+  
+  MarkydTab *tab = g_new0(MarkydTab, 1);
+  tab->file_path = g_strdup(path);
+  
+  tab->scroll = gtk_scrolled_window_new(NULL, NULL);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tab->scroll), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_min_content_width(GTK_SCROLLED_WINDOW(tab->scroll), 100);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(tab->scroll), 100);
+  
+  tab->editor = markyd_editor_new(self->app);
+  gtk_container_add(GTK_CONTAINER(tab->scroll), markyd_editor_get_widget(tab->editor));
+  
+  if (content) {
+    markyd_editor_set_content(tab->editor, content);
+  }
+  
+  g_signal_connect(tab->editor->buffer, "changed", G_CALLBACK(on_editor_buffer_changed), self);
+  
+  // Construct tab label
+  GtkWidget *tab_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gchar *label_text;
+  if (path) {
+    gchar *base = g_path_get_basename(path);
+    label_text = g_strdup(base);
+    g_free(base);
+  } else {
+    label_text = g_strdup("Untitled");
+  }
+  
+  GtkWidget *tab_label = gtk_label_new(label_text);
+  g_free(label_text);
+  gtk_box_pack_start(GTK_BOX(tab_box), tab_label, TRUE, TRUE, 0);
+  
+  GtkWidget *close_btn = gtk_button_new_from_icon_name("window-close-symbolic", GTK_ICON_SIZE_MENU);
+  gtk_button_set_relief(GTK_BUTTON(close_btn), GTK_RELIEF_NONE);
+  g_object_set_data(G_OBJECT(close_btn), "tab-ref", tab);
+  g_signal_connect(close_btn, "clicked", G_CALLBACK(on_tab_close_clicked), self);
+  gtk_box_pack_start(GTK_BOX(tab_box), close_btn, FALSE, FALSE, 0);
+  
+  gtk_widget_show_all(tab_box);
+  gtk_widget_show_all(tab->scroll);
+  
+  self->tabs = g_list_append(self->tabs, tab);
+  
+  gint page_idx = gtk_notebook_append_page(GTK_NOTEBOOK(self->notebook), tab->scroll, tab_box);
+  gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK(self->notebook), tab->scroll, TRUE);
+  
+  // Update state visibility
+  gtk_widget_hide(self->empty_state_box);
+  gtk_widget_show(self->notebook);
+  
+  // We temporarily set self->editor so ensure_search_tags applies to it
+  MarkydEditor *old_editor = self->editor;
+  self->editor = tab->editor;
+  ensure_search_tags(self);
+  self->editor = old_editor;
+  
+  gtk_notebook_set_current_page(GTK_NOTEBOOK(self->notebook), page_idx);
+  
+  return tab;
+}
+
+void markyd_window_close_tab(MarkydWindow *self, MarkydTab *tab) {
+  if (!self || !tab) return;
+  
+  gint page_num = gtk_notebook_page_num(GTK_NOTEBOOK(self->notebook), tab->scroll);
+  if (page_num >= 0) {
+    gtk_notebook_remove_page(GTK_NOTEBOOK(self->notebook), page_num);
+  }
+  
+  self->tabs = g_list_remove(self->tabs, tab);
+  
+  if (tab->editor) {
+    g_signal_handlers_disconnect_by_func(tab->editor->buffer, on_editor_buffer_changed, self);
+    markyd_editor_free(tab->editor);
+    // Wait, markyd_editor_new allocates a struct. markyd_editor_get_widget returns a widget.
+    // If we don't have a markyd_editor_free, we will leak the struct.
+    // Let's check if there is a markyd_editor_free.
+  }
+  
+  g_free(tab->file_path);
+  g_free(tab);
+  
+  if (g_list_length(self->tabs) == 0) {
+    gtk_widget_hide(self->notebook);
+    gtk_widget_show(self->empty_state_box);
+    self->current_tab = NULL;
+    self->editor = NULL;
+    update_window_title_for_tab(self);
+  }
+}
+
+const gchar *markyd_window_get_current_path(MarkydWindow *self) {
+  if (self && self->current_tab) {
+    return self->current_tab->file_path;
+  }
+  return NULL;
 }

@@ -3,7 +3,7 @@ Version:        @VERSION@
 Release:        1%{?dist}
 Summary:        Lightweight GTK3 markdown viewer
 
-License:        MIT
+License:        GPL-3.0-or-later
 URL:            @URL@
 Source0:        viewmd-%{version}.tar.gz
 

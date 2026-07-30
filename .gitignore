@@ -1,0 +1,29 @@
+# Build outputs (binary rename lands later with branding)
+/viewmd
+/obj/
+*.o
+*~
+
+# configure-generated machine-local paths (never commit)
+/config.mk
+
+# Ephemeral local work
+/scratch/
+*.pyc
+.env
+.env.*
+
+# Local throwaway tests / experiments (not wired into Makefile)
+/test_scroll
+/test_scroll.c
+/test_bookmarks.c
+/fix_window.py
+/patch.c
+/patch_window.py
+/plan.md
+/tab_logic.c
+
+# Editor / OS noise
+*.swp
+*.swo
+.DS_Store
