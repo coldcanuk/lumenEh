@@ -6,6 +6,12 @@
 typedef struct _MarkydApp MarkydApp;
 typedef struct _MarkydEditor MarkydEditor;
 
+typedef struct _MarkydTab {
+  MarkydEditor *editor;
+  GtkWidget *scroll;
+  gchar *file_path;
+} MarkydTab;
+
 typedef struct _MarkydWindow {
   GtkWidget *window;
   GtkWidget *header_bar;
@@ -19,7 +25,12 @@ typedef struct _MarkydWindow {
   GtkWidget *btn_search_next;
   GtkWidget *lbl_search_status;
   GtkWidget *lbl_title;
-  GtkWidget *scroll;
+  
+  GtkWidget *notebook;
+  GtkWidget *empty_state_box;
+  GList *tabs;
+  MarkydTab *current_tab;
+
   MarkydEditor *editor;
   MarkydApp *app;
   GArray *search_matches;
@@ -29,6 +40,11 @@ typedef struct _MarkydWindow {
 /* Lifecycle */
 MarkydWindow *markyd_window_new(MarkydApp *app);
 void markyd_window_free(MarkydWindow *win);
+
+/* Tab management */
+MarkydTab *markyd_window_open_tab(MarkydWindow *win, const gchar *path, const gchar *content);
+void markyd_window_close_tab(MarkydWindow *win, MarkydTab *tab);
+const gchar *markyd_window_get_current_path(MarkydWindow *win);
 
 /* Visibility */
 void markyd_window_show(MarkydWindow *win);

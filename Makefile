@@ -1,6 +1,4 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -O2 -g `pkg-config --cflags gtk+-3.0`
-LDFLAGS = `pkg-config --libs gtk+-3.0`
+include config.mk
 
 SRCDIR = src
 OBJDIR = obj
@@ -10,12 +8,7 @@ SOURCES = $(wildcard $(SRCDIR)/*.c)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/md4c.o
 TARGET = $(BINDIR)/viewmd
 
-PREFIX ?= /usr/local
 DESTDIR ?=
-
-bindir ?= $(PREFIX)/bin
-datadir ?= $(PREFIX)/share
-applicationsdir ?= $(datadir)/applications
 
 .PHONY: all clean install uninstall
 
@@ -24,10 +17,10 @@ all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c Makefile config.mk | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.c | $(OBJDIR)
+$(OBJDIR)/md4c.o: $(SRCDIR)/md4c/md4c.c Makefile config.mk | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR):

@@ -145,6 +145,30 @@ static void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeV
   }
 }
 
+static void on_bookmark_path_clicked(GtkButton *btn, gpointer user_data) {
+  RemoteBrowserData *data = (RemoteBrowserData *)user_data;
+  (void)btn;
+  
+  // Construct the base host URI (e.g. ssh://user@host:port)
+  GString *s = g_string_new("ssh://");
+  if (data->current_loc->user && data->current_loc->user[0] != '\0') {
+    g_string_append_printf(s, "%s@", data->current_loc->user);
+  }
+  g_string_append(s, data->current_loc->host ? data->current_loc->host : "localhost");
+  if (data->current_loc->port > 0 && data->current_loc->port != 22) {
+    g_string_append_printf(s, ":%d", data->current_loc->port);
+  }
+  gchar *host_uri = g_string_free(s, FALSE);
+  
+  const gchar *path = gtk_entry_get_text(GTK_ENTRY(data->path_entry));
+  if (viewmd_bookmark_path_add(host_uri, path)) {
+    gtk_label_set_text(GTK_LABEL(data->status_label), "Path bookmarked.");
+  } else {
+    gtk_label_set_text(GTK_LABEL(data->status_label), "Path is already bookmarked.");
+  }
+  g_free(host_uri);
+}
+
 static void on_path_entry_activate(GtkEntry *entry, gpointer user_data) {
   RemoteBrowserData *data = (RemoteBrowserData *)user_data;
   const gchar *new_path = gtk_entry_get_text(entry);
@@ -190,6 +214,10 @@ void remote_browser_dialog_run(MarkydWindow *window, const gchar *initial_host_u
   gtk_widget_set_hexpand(data.path_entry, TRUE);
   g_signal_connect(data.path_entry, "activate", G_CALLBACK(on_path_entry_activate), &data);
   gtk_box_pack_start(GTK_BOX(path_box), data.path_entry, TRUE, TRUE, 0);
+
+  GtkWidget *btn_bookmark = gtk_button_new_with_label("Bookmark Path");
+  g_signal_connect(btn_bookmark, "clicked", G_CALLBACK(on_bookmark_path_clicked), &data);
+  gtk_box_pack_start(GTK_BOX(path_box), btn_bookmark, FALSE, FALSE, 0);
 
   // Tree View
   GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);

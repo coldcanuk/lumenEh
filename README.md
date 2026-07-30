@@ -9,6 +9,7 @@ A lightweight GTK 3 markdown viewer for desktop Linux. It is ideal as your defau
 - **Native GTK viewer** - No webviews
 - **Read-only rendering** - Focused on viewing markdown files
 - **Minimal UI** - Clean toolbar with open and settings buttons
+- **Tabbed interface** - Open multiple documents at once with an intuitive empty state
 - **Lightweight** - Pure C, no web technologies, fast startup
 - **Hyperlink support** - Left click opens links and internal anchors
 - **Document search** - `Ctrl+F` with next/previous match navigation
@@ -64,6 +65,19 @@ Run `viewmd` to start the application.
 - **Reload button**: Reload the currently open document from disk
 - **Settings button**: Adjust theme, fonts, and markdown accent colors
 
+### Remote SSH File Manager
+
+ViewMD can natively browse and open Markdown files hosted on remote servers over SSH.
+
+- Click the **Open Remote (SSH)** button in the header bar.
+- Enter an SSH URI (e.g., `ssh://user@hostname/path/to/docs` or `user@hostname:/path/to/docs`).
+- Use the **Browse** button to navigate the remote filesystem and select documents.
+- Use the **Save Host** and **Delete Host** buttons to manage frequently accessed remote servers without saving credentials.
+- Bookmark specific files or directories directly from the file browser using the **Bookmark Path** button, which nested them under your saved hosts.
+- Select a host to dynamically load its saved paths.
+
+> **Important**: This feature executes the system `ssh` command. For the best user experience and seamless background loading, it is highly recommended to configure **SSH keys** and `ssh-agent`. Password prompts will cause the fetch to fail because the subprocess runs in batch mode (`-o BatchMode=yes`).
+
 ### Find in Document
 
 - Press `Ctrl+F` to open search.
@@ -96,6 +110,7 @@ xdg-open README.md
 ## Building From Source
 
 ```bash
+./configure
 make
 sudo make install
 ```
@@ -142,3 +157,12 @@ MIT License
 - For a feature complete AI application try out [ChatGTK](https://github.com/rabfulton/ChatGTK)
 - A lightweight speech to text implementation [Auriscribe](https://github.com/rabfulton/Auriscribe)
 - A lightweight local movie database and browser [ReelVault](https://github.com/rabfulton/ReelVault)
+
+## License & provenance
+
+**lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton and contributors.
+
+- Combined work: **GPL-3.0-or-later** (see [`LICENSE`](LICENSE))
+- Upstream ViewMD and vendored **md4c** retain their MIT terms as documented in [`NOTICE`](NOTICE)
+
+Binary and package names may still say `viewmd` until the branding pass.

@@ -11,8 +11,6 @@ typedef struct _MarkydEditor MarkydEditor;
 typedef struct _MarkydApp {
   GtkApplication *gtk_app;
   MarkydWindow *window;
-  MarkydEditor *editor;
-  gchar *current_file_path;
 } MarkydApp;
 
 /* Global app instance */
