@@ -6,7 +6,7 @@ BINDIR = .
 
 SOURCES = $(wildcard $(SRCDIR)/*.c)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/md4c.o
-TARGET = $(BINDIR)/viewmd
+TARGET = $(BINDIR)/lumeneh
 
 DESTDIR ?=
 
@@ -30,12 +30,12 @@ clean:
 	rm -rf $(OBJDIR) $(TARGET)
 
 install: $(TARGET)
-	install -Dm755 $(TARGET) $(DESTDIR)$(bindir)/viewmd
-	install -Dm644 assets/viewmd.desktop $(DESTDIR)$(applicationsdir)/viewmd.desktop
+	install -Dm755 $(TARGET) $(DESTDIR)$(bindir)/lumeneh
+	install -Dm644 assets/lumeneh.desktop $(DESTDIR)$(applicationsdir)/lumeneh.desktop
 
 uninstall:
-	rm -f $(DESTDIR)$(bindir)/viewmd
-	rm -f $(DESTDIR)$(applicationsdir)/viewmd.desktop
+	rm -f $(DESTDIR)$(bindir)/lumeneh
+	rm -f $(DESTDIR)$(applicationsdir)/lumeneh.desktop
 
 # Header dependencies
 $(OBJDIR)/main.o: $(SRCDIR)/app.h $(SRCDIR)/window.h

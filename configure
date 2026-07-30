@@ -1,5 +1,5 @@
 #!/bin/bash
-# configure script for ViewMD
+# configure script for lumenEh
 
 # Default variables
 PREFIX="/usr/local"

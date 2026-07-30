@@ -1,7 +1,7 @@
-pkgname=viewmd
+pkgname=lumeneh
 pkgver=0.r0.g0000000
 pkgrel=1
-pkgdesc="Lightweight GTK3 markdown viewer"
+pkgdesc="lumenEh — native GTK3 markdown viewer (local + SSH)"
 arch=('x86_64')
 url="https://github.com/coldcanuk/lumenEh"
 license=('GPL-3.0-or-later')

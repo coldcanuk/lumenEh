@@ -1,14 +1,14 @@
-#ifndef MARKYD_EDITOR_H
-#define MARKYD_EDITOR_H
+#ifndef LUMENEH_EDITOR_H
+#define LUMENEH_EDITOR_H
 
 #include <gtk/gtk.h>
 
-typedef struct _MarkydApp MarkydApp;
+typedef struct _LumenehApp LumenehApp;
 
-typedef struct _MarkydEditor {
+typedef struct _LumenehEditor {
   GtkWidget *text_view;
   GtkTextBuffer *buffer;
-  MarkydApp *app;
+  LumenehApp *app;
 
   /* Original markdown content loaded into the viewer. */
   gchar *source_content;
@@ -18,21 +18,21 @@ typedef struct _MarkydEditor {
 
   /* Coalesce markdown re-rendering to idle to avoid invalidating GTK iterators. */
   guint markdown_idle_id;
-} MarkydEditor;
+} LumenehEditor;
 
 /* Lifecycle */
-MarkydEditor *markyd_editor_new(MarkydApp *app);
-void markyd_editor_free(MarkydEditor *editor);
+LumenehEditor *lumeneh_editor_new(LumenehApp *app);
+void lumeneh_editor_free(LumenehEditor *editor);
 
 /* Content management */
-void markyd_editor_set_content(MarkydEditor *editor, const gchar *content);
-gchar *markyd_editor_get_content(MarkydEditor *editor);
+void lumeneh_editor_set_content(LumenehEditor *editor, const gchar *content);
+gchar *lumeneh_editor_get_content(LumenehEditor *editor);
 
 /* Widget access */
-GtkWidget *markyd_editor_get_widget(MarkydEditor *editor);
-void markyd_editor_focus(MarkydEditor *editor);
+GtkWidget *lumeneh_editor_get_widget(LumenehEditor *editor);
+void lumeneh_editor_focus(LumenehEditor *editor);
 
 /* Force a refresh of markdown styling/rendering (e.g., after settings change). */
-void markyd_editor_refresh(MarkydEditor *editor);
+void lumeneh_editor_refresh(LumenehEditor *editor);
 
-#endif /* MARKYD_EDITOR_H */
+#endif /* LUMENEH_EDITOR_H */

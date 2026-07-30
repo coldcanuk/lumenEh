@@ -11,7 +11,7 @@ enum {
 };
 
 typedef struct {
-  MarkydWindow *window;
+  LumenehWindow *window;
   GtkWidget *dialog;
   GtkWidget *tree_view;
   GtkListStore *list_store;
@@ -136,7 +136,7 @@ static void on_row_activated(GtkTreeView *tree_view, GtkTreePath *path, GtkTreeV
       
       // Close dialog and open file
       gtk_dialog_response(GTK_DIALOG(data->dialog), GTK_RESPONSE_ACCEPT);
-      markyd_app_open_file(data->window->app, uri);
+      lumeneh_app_open_file(data->window->app, uri);
       
       g_free(full_path);
       g_free(uri);
@@ -161,7 +161,7 @@ static void on_bookmark_path_clicked(GtkButton *btn, gpointer user_data) {
   gchar *host_uri = g_string_free(s, FALSE);
   
   const gchar *path = gtk_entry_get_text(GTK_ENTRY(data->path_entry));
-  if (viewmd_bookmark_path_add(host_uri, path)) {
+  if (lumeneh_bookmark_path_add(host_uri, path)) {
     gtk_label_set_text(GTK_LABEL(data->status_label), "Path bookmarked.");
   } else {
     gtk_label_set_text(GTK_LABEL(data->status_label), "Path is already bookmarked.");
@@ -175,7 +175,7 @@ static void on_path_entry_activate(GtkEntry *entry, gpointer user_data) {
   load_directory(data, new_path);
 }
 
-void remote_browser_dialog_run(MarkydWindow *window, const gchar *initial_host_uri) {
+void remote_browser_dialog_run(LumenehWindow *window, const gchar *initial_host_uri) {
   RemoteBrowserData data;
   data.window = window;
   data.current_loc = remote_ssh_parse_uri(initial_host_uri);

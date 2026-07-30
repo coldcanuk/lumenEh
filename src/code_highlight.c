@@ -1,10 +1,10 @@
 #include "code_highlight.h"
 #include <string.h>
 
-#define MARKYD_SCAN_FLAG_BLOCK_COMMENT (1u << 0)
-#define MARKYD_SCAN_FLAG_JAVA_TEXT_BLOCK (1u << 1)
-#define MARKYD_SCAN_FLAG_PY_TRIPLE_SINGLE (1u << 2)
-#define MARKYD_SCAN_FLAG_PY_TRIPLE_DOUBLE (1u << 3)
+#define LUMENEH_SCAN_FLAG_BLOCK_COMMENT (1u << 0)
+#define LUMENEH_SCAN_FLAG_JAVA_TEXT_BLOCK (1u << 1)
+#define LUMENEH_SCAN_FLAG_PY_TRIPLE_SINGLE (1u << 2)
+#define LUMENEH_SCAN_FLAG_PY_TRIPLE_DOUBLE (1u << 3)
 
 static const gchar *const c_kw_group_a[] = {
     "break", "case",   "continue", "default", "do",    "else",
@@ -23,10 +23,10 @@ static const gchar *const c_kw_group_c[] = {
     "void",   "_Alignof",   "_Bool",   "_Complex", "_Generic", "_Imaginary",
 };
 
-static const MarkydKeywordGroup c_groups[] = {
-    {MARKYD_TAG_CODE_KW_A, c_kw_group_a, G_N_ELEMENTS(c_kw_group_a)},
-    {MARKYD_TAG_CODE_KW_B, c_kw_group_b, G_N_ELEMENTS(c_kw_group_b)},
-    {MARKYD_TAG_CODE_KW_C, c_kw_group_c, G_N_ELEMENTS(c_kw_group_c)},
+static const LumenehKeywordGroup c_groups[] = {
+    {LUMENEH_TAG_CODE_KW_A, c_kw_group_a, G_N_ELEMENTS(c_kw_group_a)},
+    {LUMENEH_TAG_CODE_KW_B, c_kw_group_b, G_N_ELEMENTS(c_kw_group_b)},
+    {LUMENEH_TAG_CODE_KW_C, c_kw_group_c, G_N_ELEMENTS(c_kw_group_c)},
 };
 
 static const gchar *const java_kw_group_a[] = {
@@ -48,10 +48,10 @@ static const gchar *const java_kw_group_c[] = {
     "int",     "long", "short", "void",
 };
 
-static const MarkydKeywordGroup java_groups[] = {
-    {MARKYD_TAG_CODE_KW_A, java_kw_group_a, G_N_ELEMENTS(java_kw_group_a)},
-    {MARKYD_TAG_CODE_KW_B, java_kw_group_b, G_N_ELEMENTS(java_kw_group_b)},
-    {MARKYD_TAG_CODE_KW_C, java_kw_group_c, G_N_ELEMENTS(java_kw_group_c)},
+static const LumenehKeywordGroup java_groups[] = {
+    {LUMENEH_TAG_CODE_KW_A, java_kw_group_a, G_N_ELEMENTS(java_kw_group_a)},
+    {LUMENEH_TAG_CODE_KW_B, java_kw_group_b, G_N_ELEMENTS(java_kw_group_b)},
+    {LUMENEH_TAG_CODE_KW_C, java_kw_group_c, G_N_ELEMENTS(java_kw_group_c)},
 };
 
 static const gchar *const py_kw_group_a[] = {
@@ -70,10 +70,10 @@ static const gchar *const py_kw_group_c[] = {
     "False", "None", "True",
 };
 
-static const MarkydKeywordGroup py_groups[] = {
-    {MARKYD_TAG_CODE_KW_A, py_kw_group_a, G_N_ELEMENTS(py_kw_group_a)},
-    {MARKYD_TAG_CODE_KW_B, py_kw_group_b, G_N_ELEMENTS(py_kw_group_b)},
-    {MARKYD_TAG_CODE_KW_C, py_kw_group_c, G_N_ELEMENTS(py_kw_group_c)},
+static const LumenehKeywordGroup py_groups[] = {
+    {LUMENEH_TAG_CODE_KW_A, py_kw_group_a, G_N_ELEMENTS(py_kw_group_a)},
+    {LUMENEH_TAG_CODE_KW_B, py_kw_group_b, G_N_ELEMENTS(py_kw_group_b)},
+    {LUMENEH_TAG_CODE_KW_C, py_kw_group_c, G_N_ELEMENTS(py_kw_group_c)},
 };
 
 static gboolean is_ascii_identifier_char(gchar c) {
@@ -129,14 +129,14 @@ static void skip_quoted_literal(const gchar **p, gint *char_index,
   }
 }
 
-static const gchar *lookup_keyword_tag(const MarkydLanguageHighlight *language,
+static const gchar *lookup_keyword_tag(const LumenehLanguageHighlight *language,
                                        const gchar *token, gsize token_len) {
   if (!language || !token || token_len == 0) {
     return NULL;
   }
 
   for (gsize i = 0; i < language->group_count; i++) {
-    const MarkydKeywordGroup *group = &language->groups[i];
+    const LumenehKeywordGroup *group = &language->groups[i];
     for (gsize k = 0; k < group->keyword_count; k++) {
       const gchar *kw = group->keywords[k];
       if (strlen(kw) == token_len && strncmp(kw, token, token_len) == 0) {
@@ -517,9 +517,9 @@ static gboolean parse_python_string_start(const gchar *p, gint *prefix_len,
   return TRUE;
 }
 
-static void scan_line_c_like(const MarkydLanguageHighlight *language,
-                             const gchar *line, MarkydCodeScanState *state,
-                             MarkydCodeTokenCallback on_token,
+static void scan_line_c_like(const LumenehLanguageHighlight *language,
+                             const gchar *line, LumenehCodeScanState *state,
+                             LumenehCodeTokenCallback on_token,
                              gpointer user_data,
                              gboolean allow_java_text_blocks) {
   const gchar *p;
@@ -531,10 +531,10 @@ static void scan_line_c_like(const MarkydLanguageHighlight *language,
     return;
   }
 
-  in_block_comment = (state->flags & MARKYD_SCAN_FLAG_BLOCK_COMMENT) != 0;
+  in_block_comment = (state->flags & LUMENEH_SCAN_FLAG_BLOCK_COMMENT) != 0;
   if (allow_java_text_blocks) {
     in_java_text_block =
-        (state->flags & MARKYD_SCAN_FLAG_JAVA_TEXT_BLOCK) != 0;
+        (state->flags & LUMENEH_SCAN_FLAG_JAVA_TEXT_BLOCK) != 0;
   }
   p = line;
   while (*p) {
@@ -549,7 +549,7 @@ static void scan_line_c_like(const MarkydLanguageHighlight *language,
         }
         advance_utf8_char(&p, &char_index);
       }
-      on_token(start_char_index, char_index, MARKYD_TAG_CODE_LITERAL, user_data);
+      on_token(start_char_index, char_index, LUMENEH_TAG_CODE_LITERAL, user_data);
       continue;
     }
 
@@ -587,13 +587,13 @@ static void scan_line_c_like(const MarkydLanguageHighlight *language,
         }
         advance_utf8_char(&p, &char_index);
       }
-      on_token(start_char_index, char_index, MARKYD_TAG_CODE_LITERAL, user_data);
+      on_token(start_char_index, char_index, LUMENEH_TAG_CODE_LITERAL, user_data);
       continue;
     }
     if (p[0] == '"' || p[0] == '\'') {
       gint start_char_index = char_index;
       skip_quoted_literal(&p, &char_index, p[0]);
-      on_token(start_char_index, char_index, MARKYD_TAG_CODE_LITERAL, user_data);
+      on_token(start_char_index, char_index, LUMENEH_TAG_CODE_LITERAL, user_data);
       continue;
     }
 
@@ -629,7 +629,7 @@ static void scan_line_c_like(const MarkydLanguageHighlight *language,
     if (starts_number_c(line, p)) {
       gint number_chars = scan_number_c(p);
       if (number_chars > 0) {
-        on_token(char_index, char_index + number_chars, MARKYD_TAG_CODE_LITERAL,
+        on_token(char_index, char_index + number_chars, LUMENEH_TAG_CODE_LITERAL,
                  user_data);
         p += number_chars;
         char_index += number_chars;
@@ -642,33 +642,33 @@ static void scan_line_c_like(const MarkydLanguageHighlight *language,
   }
 
   if (in_block_comment) {
-    state->flags |= MARKYD_SCAN_FLAG_BLOCK_COMMENT;
+    state->flags |= LUMENEH_SCAN_FLAG_BLOCK_COMMENT;
   } else {
-    state->flags &= ~MARKYD_SCAN_FLAG_BLOCK_COMMENT;
+    state->flags &= ~LUMENEH_SCAN_FLAG_BLOCK_COMMENT;
   }
   if (allow_java_text_blocks && in_java_text_block) {
-    state->flags |= MARKYD_SCAN_FLAG_JAVA_TEXT_BLOCK;
+    state->flags |= LUMENEH_SCAN_FLAG_JAVA_TEXT_BLOCK;
   } else {
-    state->flags &= ~MARKYD_SCAN_FLAG_JAVA_TEXT_BLOCK;
+    state->flags &= ~LUMENEH_SCAN_FLAG_JAVA_TEXT_BLOCK;
   }
 }
 
-static void scan_line_c(const MarkydLanguageHighlight *language,
-                        const gchar *line, MarkydCodeScanState *state,
-                        MarkydCodeTokenCallback on_token, gpointer user_data) {
+static void scan_line_c(const LumenehLanguageHighlight *language,
+                        const gchar *line, LumenehCodeScanState *state,
+                        LumenehCodeTokenCallback on_token, gpointer user_data) {
   scan_line_c_like(language, line, state, on_token, user_data, FALSE);
 }
 
-static void scan_line_java(const MarkydLanguageHighlight *language,
-                           const gchar *line, MarkydCodeScanState *state,
-                           MarkydCodeTokenCallback on_token,
+static void scan_line_java(const LumenehLanguageHighlight *language,
+                           const gchar *line, LumenehCodeScanState *state,
+                           LumenehCodeTokenCallback on_token,
                            gpointer user_data) {
   scan_line_c_like(language, line, state, on_token, user_data, TRUE);
 }
 
-static void scan_line_python(const MarkydLanguageHighlight *language,
-                             const gchar *line, MarkydCodeScanState *state,
-                             MarkydCodeTokenCallback on_token,
+static void scan_line_python(const LumenehLanguageHighlight *language,
+                             const gchar *line, LumenehCodeScanState *state,
+                             LumenehCodeTokenCallback on_token,
                              gpointer user_data) {
   const gchar *p;
   gint char_index = 0;
@@ -679,8 +679,8 @@ static void scan_line_python(const MarkydLanguageHighlight *language,
     return;
   }
 
-  in_triple_single = (state->flags & MARKYD_SCAN_FLAG_PY_TRIPLE_SINGLE) != 0;
-  in_triple_double = (state->flags & MARKYD_SCAN_FLAG_PY_TRIPLE_DOUBLE) != 0;
+  in_triple_single = (state->flags & LUMENEH_SCAN_FLAG_PY_TRIPLE_SINGLE) != 0;
+  in_triple_double = (state->flags & LUMENEH_SCAN_FLAG_PY_TRIPLE_DOUBLE) != 0;
 
   p = line;
   while (*p) {
@@ -699,7 +699,7 @@ static void scan_line_python(const MarkydLanguageHighlight *language,
         advance_utf8_char(&p, &char_index);
       }
 
-      on_token(start_char_index, char_index, MARKYD_TAG_CODE_LITERAL, user_data);
+      on_token(start_char_index, char_index, LUMENEH_TAG_CODE_LITERAL, user_data);
       continue;
     }
 
@@ -764,7 +764,7 @@ static void scan_line_python(const MarkydLanguageHighlight *language,
           }
         }
 
-        on_token(start_char_index, char_index, MARKYD_TAG_CODE_LITERAL,
+        on_token(start_char_index, char_index, LUMENEH_TAG_CODE_LITERAL,
                  user_data);
         continue;
       }
@@ -804,7 +804,7 @@ static void scan_line_python(const MarkydLanguageHighlight *language,
     if (starts_number_python(line, p)) {
       gint number_chars = scan_number_python(p);
       if (number_chars > 0) {
-        on_token(char_index, char_index + number_chars, MARKYD_TAG_CODE_LITERAL,
+        on_token(char_index, char_index + number_chars, LUMENEH_TAG_CODE_LITERAL,
                  user_data);
         p += number_chars;
         char_index += number_chars;
@@ -816,26 +816,26 @@ static void scan_line_python(const MarkydLanguageHighlight *language,
   }
 
   if (in_triple_single) {
-    state->flags |= MARKYD_SCAN_FLAG_PY_TRIPLE_SINGLE;
+    state->flags |= LUMENEH_SCAN_FLAG_PY_TRIPLE_SINGLE;
   } else {
-    state->flags &= ~MARKYD_SCAN_FLAG_PY_TRIPLE_SINGLE;
+    state->flags &= ~LUMENEH_SCAN_FLAG_PY_TRIPLE_SINGLE;
   }
   if (in_triple_double) {
-    state->flags |= MARKYD_SCAN_FLAG_PY_TRIPLE_DOUBLE;
+    state->flags |= LUMENEH_SCAN_FLAG_PY_TRIPLE_DOUBLE;
   } else {
-    state->flags &= ~MARKYD_SCAN_FLAG_PY_TRIPLE_DOUBLE;
+    state->flags &= ~LUMENEH_SCAN_FLAG_PY_TRIPLE_DOUBLE;
   }
 }
 
-static const MarkydLanguageHighlight languages[] = {
+static const LumenehLanguageHighlight languages[] = {
     {"c", c_groups, G_N_ELEMENTS(c_groups), scan_line_c},
     {"java", java_groups, G_N_ELEMENTS(java_groups), scan_line_java},
     {"python", py_groups, G_N_ELEMENTS(py_groups), scan_line_python},
     {"py", py_groups, G_N_ELEMENTS(py_groups), scan_line_python},
 };
 
-const MarkydLanguageHighlight *
-markyd_code_lookup_language(const gchar *language) {
+const LumenehLanguageHighlight *
+lumeneh_code_lookup_language(const gchar *language) {
   if (!language || !*language) {
     return NULL;
   }
@@ -849,16 +849,16 @@ markyd_code_lookup_language(const gchar *language) {
   return NULL;
 }
 
-void markyd_code_scan_state_reset(MarkydCodeScanState *state) {
+void lumeneh_code_scan_state_reset(LumenehCodeScanState *state) {
   if (!state) {
     return;
   }
   state->flags = 0;
 }
 
-void markyd_code_scan_line(const MarkydLanguageHighlight *language,
-                           const gchar *line, MarkydCodeScanState *state,
-                           MarkydCodeTokenCallback on_token,
+void lumeneh_code_scan_line(const LumenehLanguageHighlight *language,
+                           const gchar *line, LumenehCodeScanState *state,
+                           LumenehCodeTokenCallback on_token,
                            gpointer user_data) {
   if (!language || !line || !state || !on_token) {
     return;

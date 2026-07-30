@@ -5,15 +5,15 @@
 #include "window.h"
 
 /* Global app instance */
-MarkydApp *app = NULL;
+LumenehApp *app = NULL;
 
 static void on_activate(GtkApplication *gtk_app, gpointer user_data);
 static void on_open(GtkApplication *gtk_app, GFile **files, gint n_files,
                     const gchar *hint, gpointer user_data);
-static void markyd_app_ensure_window(MarkydApp *self);
+static void lumeneh_app_ensure_window(LumenehApp *self);
 
-MarkydApp *markyd_app_new(void) {
-  MarkydApp *self = g_new0(MarkydApp, 1);
+LumenehApp *lumeneh_app_new(void) {
+  LumenehApp *self = g_new0(LumenehApp, 1);
 
   config = config_new();
   config_load(config);
@@ -27,7 +27,7 @@ MarkydApp *markyd_app_new(void) {
   flags = (GApplicationFlags)(flags | G_APPLICATION_NON_UNIQUE |
                               G_APPLICATION_HANDLES_OPEN);
 
-  self->gtk_app = gtk_application_new("org.viewmd.app", flags);
+  self->gtk_app = gtk_application_new("org.lumeneh.app", flags);
 
   g_signal_connect(self->gtk_app, "activate", G_CALLBACK(on_activate), self);
   g_signal_connect(self->gtk_app, "open", G_CALLBACK(on_open), self);
@@ -36,12 +36,12 @@ MarkydApp *markyd_app_new(void) {
   return self;
 }
 
-void markyd_app_free(MarkydApp *self) {
+void lumeneh_app_free(LumenehApp *self) {
   if (!self)
     return;
 
   if (self->window) {
-    markyd_window_free(self->window);
+    lumeneh_window_free(self->window);
   }
 
   g_object_unref(self->gtk_app);
@@ -54,34 +54,34 @@ void markyd_app_free(MarkydApp *self) {
   app = NULL;
 }
 
-int markyd_app_run(MarkydApp *self, int argc, char **argv) {
+int lumeneh_app_run(LumenehApp *self, int argc, char **argv) {
   return g_application_run(G_APPLICATION(self->gtk_app), argc, argv);
 }
 
 static void on_activate(GtkApplication *gtk_app, gpointer user_data) {
-  MarkydApp *self = (MarkydApp *)user_data;
+  LumenehApp *self = (LumenehApp *)user_data;
 
   (void)gtk_app;
-  markyd_app_ensure_window(self);
-  markyd_window_show(self->window);
+  lumeneh_app_ensure_window(self);
+  lumeneh_window_show(self->window);
 }
 
 static void on_open(GtkApplication *gtk_app, GFile **files, gint n_files,
                     const gchar *hint, gpointer user_data) {
-  MarkydApp *self = (MarkydApp *)user_data;
+  LumenehApp *self = (LumenehApp *)user_data;
   gboolean opened = FALSE;
 
   (void)gtk_app;
   (void)hint;
 
-  markyd_app_ensure_window(self);
+  lumeneh_app_ensure_window(self);
 
   for (gint i = 0; i < n_files; i++) {
     gchar *path = g_file_get_path(files[i]);
     if (!path) {
       continue;
     }
-    if (markyd_app_open_file(self, path)) {
+    if (lumeneh_app_open_file(self, path)) {
       opened = TRUE;
       g_free(path);
       break;
@@ -90,23 +90,23 @@ static void on_open(GtkApplication *gtk_app, GFile **files, gint n_files,
   }
 
   if (!opened && n_files > 0) {
-    g_printerr("ViewMD: unable to open provided file(s)\n");
+    g_printerr("lumenEh: unable to open provided file(s)\n");
   }
 
-  markyd_window_show(self->window);
+  lumeneh_window_show(self->window);
 }
 
-static void markyd_app_ensure_window(MarkydApp *self) {
+static void lumeneh_app_ensure_window(LumenehApp *self) {
   if (self->window) {
     return;
   }
 
-  self->window = markyd_window_new(self);
+  self->window = lumeneh_window_new(self);
 
-  markyd_window_open_tab(self->window, NULL, "# ViewMD\n\nUse the Open button to load a markdown document.");
+  lumeneh_window_open_tab(self->window, NULL, "# lumenEh\n\nUse the Open button to load a markdown document.");
 }
 
-gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
+gboolean lumeneh_app_open_file(LumenehApp *self, const gchar *path) {
   gchar *content = NULL;
   GError *error = NULL;
 
@@ -118,7 +118,7 @@ gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
     RemoteSSHLocation *loc = remote_ssh_parse_uri(path);
     if (loc) {
       if (remote_ssh_fetch_file(loc, &content, NULL, &error)) {
-        markyd_window_open_tab(self->window, path, content);
+        lumeneh_window_open_tab(self->window, path, content);
         g_free(content);
         remote_ssh_location_free(loc);
         return TRUE;
@@ -141,15 +141,15 @@ gboolean markyd_app_open_file(MarkydApp *self, const gchar *path) {
     return FALSE;
   }
 
-  markyd_window_open_tab(self->window, path, content);
+  lumeneh_window_open_tab(self->window, path, content);
   g_free(content);
 
   return TRUE;
 }
 
-const gchar *markyd_app_get_current_path(MarkydApp *self) {
+const gchar *lumeneh_app_get_current_path(LumenehApp *self) {
   if (self && self->window) {
-    return markyd_window_get_current_path(self->window);
+    return lumeneh_window_get_current_path(self->window);
   }
   return NULL;
 }

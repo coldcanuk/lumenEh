@@ -1,10 +1,10 @@
-#ifndef MARKYD_CONFIG_H
-#define MARKYD_CONFIG_H
+#ifndef LUMENEH_CONFIG_H
+#define LUMENEH_CONFIG_H
 
 #include <glib.h>
 
 /* Settings structure */
-typedef struct _MarkydConfig {
+typedef struct _LumenehConfig {
   /* Window geometry */
   gint window_x;
   gint window_y;
@@ -26,20 +26,20 @@ typedef struct _MarkydConfig {
   /* Editor */
   gboolean line_numbers;
   gboolean word_wrap;
-} MarkydConfig;
+} LumenehConfig;
 
 /* Global config instance */
-extern MarkydConfig *config;
+extern LumenehConfig *config;
 
 /* Lifecycle */
-MarkydConfig *config_new(void);
-void config_free(MarkydConfig *cfg);
+LumenehConfig *config_new(void);
+void config_free(LumenehConfig *cfg);
 
 /* Load/Save */
-gboolean config_load(MarkydConfig *cfg);
-gboolean config_save(MarkydConfig *cfg);
+gboolean config_load(LumenehConfig *cfg);
+gboolean config_save(LumenehConfig *cfg);
 
 /* Get config file path */
 const gchar *config_get_path(void);
 
-#endif /* MARKYD_CONFIG_H */
+#endif /* LUMENEH_CONFIG_H */

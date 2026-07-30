@@ -1,18 +1,18 @@
-#ifndef MARKYD_WINDOW_H
-#define MARKYD_WINDOW_H
+#ifndef LUMENEH_WINDOW_H
+#define LUMENEH_WINDOW_H
 
 #include <gtk/gtk.h>
 
-typedef struct _MarkydApp MarkydApp;
-typedef struct _MarkydEditor MarkydEditor;
+typedef struct _LumenehApp LumenehApp;
+typedef struct _LumenehEditor LumenehEditor;
 
-typedef struct _MarkydTab {
-  MarkydEditor *editor;
+typedef struct _LumenehTab {
+  LumenehEditor *editor;
   GtkWidget *scroll;
   gchar *file_path;
-} MarkydTab;
+} LumenehTab;
 
-typedef struct _MarkydWindow {
+typedef struct _LumenehWindow {
   GtkWidget *window;
   GtkWidget *header_bar;
   GtkWidget *btn_open;
@@ -29,30 +29,30 @@ typedef struct _MarkydWindow {
   GtkWidget *notebook;
   GtkWidget *empty_state_box;
   GList *tabs;
-  MarkydTab *current_tab;
+  LumenehTab *current_tab;
 
-  MarkydEditor *editor;
-  MarkydApp *app;
+  LumenehEditor *editor;
+  LumenehApp *app;
   GArray *search_matches;
   gint search_current_index;
-} MarkydWindow;
+} LumenehWindow;
 
 /* Lifecycle */
-MarkydWindow *markyd_window_new(MarkydApp *app);
-void markyd_window_free(MarkydWindow *win);
+LumenehWindow *lumeneh_window_new(LumenehApp *app);
+void lumeneh_window_free(LumenehWindow *win);
 
 /* Tab management */
-MarkydTab *markyd_window_open_tab(MarkydWindow *win, const gchar *path, const gchar *content);
-void markyd_window_close_tab(MarkydWindow *win, MarkydTab *tab);
-const gchar *markyd_window_get_current_path(MarkydWindow *win);
+LumenehTab *lumeneh_window_open_tab(LumenehWindow *win, const gchar *path, const gchar *content);
+void lumeneh_window_close_tab(LumenehWindow *win, LumenehTab *tab);
+const gchar *lumeneh_window_get_current_path(LumenehWindow *win);
 
 /* Visibility */
-void markyd_window_show(MarkydWindow *win);
-void markyd_window_hide(MarkydWindow *win);
-void markyd_window_toggle(MarkydWindow *win);
-gboolean markyd_window_is_visible(MarkydWindow *win);
+void lumeneh_window_show(LumenehWindow *win);
+void lumeneh_window_hide(LumenehWindow *win);
+void lumeneh_window_toggle(LumenehWindow *win);
+gboolean lumeneh_window_is_visible(LumenehWindow *win);
 
 /* Styling */
-void markyd_window_apply_css(MarkydWindow *win);
+void lumeneh_window_apply_css(LumenehWindow *win);
 
-#endif /* MARKYD_WINDOW_H */
+#endif /* LUMENEH_WINDOW_H */

@@ -10,12 +10,12 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
                                  gpointer user_data);
 static gboolean on_leave_notify(GtkWidget *widget, GdkEventCrossing *event,
                                 gpointer user_data);
-static void apply_markdown(MarkydEditor *self);
-static void schedule_markdown_apply(MarkydEditor *self);
-static void render_image_widgets(MarkydEditor *self);
-static void render_table_widgets(MarkydEditor *self);
-static void refresh_image_widget_scales(MarkydEditor *self);
-static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
+static void apply_markdown(LumenehEditor *self);
+static void schedule_markdown_apply(LumenehEditor *self);
+static void render_image_widgets(LumenehEditor *self);
+static void render_table_widgets(LumenehEditor *self);
+static void refresh_image_widget_scales(LumenehEditor *self);
+static gboolean resolve_image_source_path(LumenehEditor *self, const gchar *src,
                                           gchar **out_path);
 static void on_text_view_size_allocate(GtkWidget *widget, GtkAllocation *allocation,
                                        gpointer user_data);
@@ -32,7 +32,7 @@ static gchar *get_url_from_iter_tags(GtkTextIter *iter) {
   for (GSList *node = tags; node != NULL; node = node->next) {
     GtkTextTag *tag = GTK_TEXT_TAG(node->data);
     const gchar *stored =
-        (const gchar *)g_object_get_data(G_OBJECT(tag), VIEWMD_LINK_URL_DATA);
+        (const gchar *)g_object_get_data(G_OBJECT(tag), LUMENEH_LINK_URL_DATA);
     if (stored && stored[0] != '\0') {
       url = g_strdup(stored);
       break;
@@ -76,7 +76,7 @@ static gboolean get_link_url_at_iter(GtkTextBuffer *buffer, GtkTextIter *at,
   return FALSE;
 }
 
-static gboolean scroll_to_markdown_anchor(MarkydEditor *self,
+static gboolean scroll_to_markdown_anchor(LumenehEditor *self,
                                           const gchar *fragment) {
   gchar *mark_name;
   GtkTextMark *mark;
@@ -111,7 +111,7 @@ static gboolean scroll_to_markdown_anchor(MarkydEditor *self,
   return TRUE;
 }
 
-static void set_link_cursor(MarkydEditor *self, gboolean active) {
+static void set_link_cursor(LumenehEditor *self, gboolean active) {
   GdkWindow *win = gtk_text_view_get_window(GTK_TEXT_VIEW(self->text_view),
                                             GTK_TEXT_WINDOW_TEXT);
   if (!win) {
@@ -133,7 +133,7 @@ static void set_link_cursor(MarkydEditor *self, gboolean active) {
   }
 }
 
-static void apply_markdown(MarkydEditor *self) {
+static void apply_markdown(LumenehEditor *self) {
   if (!self) {
     return;
   }
@@ -147,7 +147,7 @@ static void apply_markdown(MarkydEditor *self) {
   self->updating_tags = FALSE;
 }
 
-static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
+static gboolean resolve_image_source_path(LumenehEditor *self, const gchar *src,
                                           gchar **out_path) {
   gchar *path = NULL;
 
@@ -158,7 +158,7 @@ static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
     return FALSE;
   }
 
-  const gchar *current_path = markyd_app_get_current_path(self->app);
+  const gchar *current_path = lumeneh_app_get_current_path(self->app);
   if (current_path && remote_ssh_is_remote_uri(current_path)) {
     RemoteSSHLocation *loc = remote_ssh_parse_uri(current_path);
     if (loc) {
@@ -202,7 +202,7 @@ static gboolean resolve_image_source_path(MarkydEditor *self, const gchar *src,
 }
 
 
-static gint get_image_max_width(MarkydEditor *self) {
+static gint get_image_max_width(LumenehEditor *self) {
   GtkAllocation alloc;
   gint width;
 
@@ -226,8 +226,8 @@ static void scale_image_widget(GtkWidget *widget, gint max_width) {
     return;
   }
 
-  image = g_object_get_data(G_OBJECT(widget), "viewmd-image-widget-child");
-  orig = g_object_get_data(G_OBJECT(widget), "viewmd-image-orig-pixbuf");
+  image = g_object_get_data(G_OBJECT(widget), "lumeneh-image-widget-child");
+  orig = g_object_get_data(G_OBJECT(widget), "lumeneh-image-orig-pixbuf");
   if (!GTK_IS_IMAGE(image) || !GDK_IS_PIXBUF(orig)) {
     return;
   }
@@ -251,7 +251,7 @@ static void scale_image_widget(GtkWidget *widget, gint max_width) {
   }
 }
 
-static void refresh_image_widget_scales(MarkydEditor *self) {
+static void refresh_image_widget_scales(LumenehEditor *self) {
   GtkTextIter iter;
   GtkTextIter end;
   gint max_width;
@@ -265,9 +265,9 @@ static void refresh_image_widget_scales(MarkydEditor *self) {
   while (!gtk_text_iter_equal(&iter, &end)) {
     GtkTextChildAnchor *anchor = gtk_text_iter_get_child_anchor(&iter);
     if (anchor &&
-        g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_ANCHOR_DATA) != NULL) {
+        g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_ANCHOR_DATA) != NULL) {
       GtkWidget *image_widget =
-          g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_WIDGET_DATA);
+          g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_WIDGET_DATA);
       if (image_widget) {
         scale_image_widget(image_widget, max_width);
       }
@@ -276,7 +276,7 @@ static void refresh_image_widget_scales(MarkydEditor *self) {
   }
 }
 
-static void render_image_widgets(MarkydEditor *self) {
+static void render_image_widgets(LumenehEditor *self) {
   GtkTextIter iter;
   GtkTextIter end;
   gint max_width;
@@ -290,14 +290,14 @@ static void render_image_widgets(MarkydEditor *self) {
   while (!gtk_text_iter_equal(&iter, &end)) {
     GtkTextChildAnchor *anchor = gtk_text_iter_get_child_anchor(&iter);
     if (anchor &&
-        g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_ANCHOR_DATA) != NULL) {
+        g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_ANCHOR_DATA) != NULL) {
       GtkWidget *image_widget =
-          g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_WIDGET_DATA);
+          g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_WIDGET_DATA);
       if (!image_widget) {
         const gchar *src =
-            g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_SRC_DATA);
+            g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_SRC_DATA);
         const gchar *alt =
-            g_object_get_data(G_OBJECT(anchor), VIEWMD_IMAGE_ALT_DATA);
+            g_object_get_data(G_OBJECT(anchor), LUMENEH_IMAGE_ALT_DATA);
         gchar *path = NULL;
 
         if (resolve_image_source_path(self, src, &path)) {
@@ -309,9 +309,9 @@ static void render_image_widgets(MarkydEditor *self) {
             gtk_event_box_set_visible_window(GTK_EVENT_BOX(event_box), FALSE);
             gtk_widget_set_halign(event_box, GTK_ALIGN_START);
             gtk_container_add(GTK_CONTAINER(event_box), image);
-            g_object_set_data(G_OBJECT(event_box), "viewmd-image-widget-child",
+            g_object_set_data(G_OBJECT(event_box), "lumeneh-image-widget-child",
                               image);
-            g_object_set_data_full(G_OBJECT(event_box), "viewmd-image-orig-pixbuf",
+            g_object_set_data_full(G_OBJECT(event_box), "lumeneh-image-orig-pixbuf",
                                    orig, g_object_unref);
             scale_image_widget(event_box, max_width);
             image_widget = event_box;
@@ -331,7 +331,7 @@ static void render_image_widgets(MarkydEditor *self) {
         gtk_text_view_add_child_at_anchor(GTK_TEXT_VIEW(self->text_view),
                                           image_widget, anchor);
         gtk_widget_show_all(image_widget);
-        g_object_set_data(G_OBJECT(anchor), VIEWMD_IMAGE_WIDGET_DATA, image_widget);
+        g_object_set_data(G_OBJECT(anchor), LUMENEH_IMAGE_WIDGET_DATA, image_widget);
         g_free(path);
       } else {
         scale_image_widget(image_widget, max_width);
@@ -341,7 +341,7 @@ static void render_image_widgets(MarkydEditor *self) {
   }
 }
 
-static void render_table_widgets(MarkydEditor *self) {
+static void render_table_widgets(LumenehEditor *self) {
   GtkTextIter iter;
   GtkTextIter end;
 
@@ -353,16 +353,16 @@ static void render_table_widgets(MarkydEditor *self) {
   while (!gtk_text_iter_equal(&iter, &end)) {
     GtkTextChildAnchor *anchor = gtk_text_iter_get_child_anchor(&iter);
     if (anchor &&
-        g_object_get_data(G_OBJECT(anchor), VIEWMD_TABLE_ANCHOR_DATA) != NULL) {
+        g_object_get_data(G_OBJECT(anchor), LUMENEH_TABLE_ANCHOR_DATA) != NULL) {
       GtkWidget *table =
-          g_object_get_data(G_OBJECT(anchor), VIEWMD_TABLE_WIDGET_DATA);
+          g_object_get_data(G_OBJECT(anchor), LUMENEH_TABLE_WIDGET_DATA);
       if (!table) {
         table = markdown_create_table_widget(anchor);
         if (table) {
           gtk_text_view_add_child_at_anchor(GTK_TEXT_VIEW(self->text_view), table,
                                             anchor);
           gtk_widget_show_all(table);
-          g_object_set_data(G_OBJECT(anchor), VIEWMD_TABLE_WIDGET_DATA, table);
+          g_object_set_data(G_OBJECT(anchor), LUMENEH_TABLE_WIDGET_DATA, table);
         }
       }
     }
@@ -371,13 +371,13 @@ static void render_table_widgets(MarkydEditor *self) {
 }
 
 static gboolean apply_markdown_idle(gpointer user_data) {
-  MarkydEditor *self = (MarkydEditor *)user_data;
+  LumenehEditor *self = (LumenehEditor *)user_data;
   self->markdown_idle_id = 0;
   apply_markdown(self);
   return G_SOURCE_REMOVE;
 }
 
-static void schedule_markdown_apply(MarkydEditor *self) {
+static void schedule_markdown_apply(LumenehEditor *self) {
   if (!self || self->updating_tags || self->markdown_idle_id != 0) {
     return;
   }
@@ -386,10 +386,10 @@ static void schedule_markdown_apply(MarkydEditor *self) {
       g_idle_add_full(G_PRIORITY_LOW, apply_markdown_idle, self, NULL);
 }
 
-void markyd_editor_refresh(MarkydEditor *self) { schedule_markdown_apply(self); }
+void lumeneh_editor_refresh(LumenehEditor *self) { schedule_markdown_apply(self); }
 
-MarkydEditor *markyd_editor_new(MarkydApp *app) {
-  MarkydEditor *self = g_new0(MarkydEditor, 1);
+LumenehEditor *lumeneh_editor_new(LumenehApp *app) {
+  LumenehEditor *self = g_new0(LumenehEditor, 1);
 
   self->app = app;
   self->source_content = g_strdup("");
@@ -426,13 +426,13 @@ MarkydEditor *markyd_editor_new(MarkydApp *app) {
 
 static void on_text_view_size_allocate(GtkWidget *widget, GtkAllocation *allocation,
                                        gpointer user_data) {
-  MarkydEditor *self = (MarkydEditor *)user_data;
+  LumenehEditor *self = (LumenehEditor *)user_data;
   (void)widget;
   (void)allocation;
   refresh_image_widget_scales(self);
 }
 
-void markyd_editor_free(MarkydEditor *self) {
+void lumeneh_editor_free(LumenehEditor *self) {
   if (!self) {
     return;
   }
@@ -444,7 +444,7 @@ void markyd_editor_free(MarkydEditor *self) {
   g_free(self);
 }
 
-void markyd_editor_set_content(MarkydEditor *self, const gchar *content) {
+void lumeneh_editor_set_content(LumenehEditor *self, const gchar *content) {
   if (!self) {
     return;
   }
@@ -458,18 +458,18 @@ void markyd_editor_set_content(MarkydEditor *self, const gchar *content) {
   schedule_markdown_apply(self);
 }
 
-gchar *markyd_editor_get_content(MarkydEditor *self) {
+gchar *lumeneh_editor_get_content(LumenehEditor *self) {
   if (!self) {
     return g_strdup("");
   }
   return g_strdup(self->source_content ? self->source_content : "");
 }
 
-GtkWidget *markyd_editor_get_widget(MarkydEditor *self) {
+GtkWidget *lumeneh_editor_get_widget(LumenehEditor *self) {
   return self->text_view;
 }
 
-void markyd_editor_focus(MarkydEditor *self) {
+void lumeneh_editor_focus(LumenehEditor *self) {
   GtkTextMark *insert_mark;
 
   if (!self || !self->text_view || !self->buffer) {
@@ -486,7 +486,7 @@ void markyd_editor_focus(MarkydEditor *self) {
 
 static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
                                   gpointer user_data) {
-  MarkydEditor *self = (MarkydEditor *)user_data;
+  LumenehEditor *self = (LumenehEditor *)user_data;
   GtkTextIter iter;
   gint bx, by;
   gchar *url = NULL;
@@ -541,7 +541,7 @@ static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
 
 static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
                                  gpointer user_data) {
-  MarkydEditor *self = (MarkydEditor *)user_data;
+  LumenehEditor *self = (LumenehEditor *)user_data;
   GtkTextIter iter;
   gint bx, by;
   gchar *url = NULL;
@@ -558,7 +558,7 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
 
 static gboolean on_leave_notify(GtkWidget *widget, GdkEventCrossing *event,
                                 gpointer user_data) {
-  MarkydEditor *self = (MarkydEditor *)user_data;
+  LumenehEditor *self = (LumenehEditor *)user_data;
   (void)widget;
   (void)event;
   set_link_cursor(self, FALSE);

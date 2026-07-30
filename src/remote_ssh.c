@@ -145,7 +145,7 @@ gboolean remote_ssh_fetch_file(const RemoteSSHLocation *loc,
   }
 
   /* Construct command with delimiters and base64 encoding to ignore bashrc noise */
-  remote_cmd = g_strdup_printf("echo '===VIEWMD_START==='; base64 '%s'; echo '===VIEWMD_END==='", loc->path);
+  remote_cmd = g_strdup_printf("echo '===LUMENEH_START==='; base64 '%s'; echo '===LUMENEH_END==='", loc->path);
 
   args = g_ptr_array_new_with_free_func(g_free);
   build_ssh_args(loc, args, remote_cmd);
@@ -183,11 +183,11 @@ gboolean remote_ssh_fetch_file(const RemoteSSHLocation *loc,
   g_free(stderr_buf);
   
   if (stdout_buf) {
-    gchar *start_marker = g_strstr_len(stdout_buf, -1, "===VIEWMD_START===\n");
-    gchar *end_marker = g_strstr_len(stdout_buf, -1, "===VIEWMD_END===");
+    gchar *start_marker = g_strstr_len(stdout_buf, -1, "===LUMENEH_START===\n");
+    gchar *end_marker = g_strstr_len(stdout_buf, -1, "===LUMENEH_END===");
     
     if (start_marker && end_marker && end_marker > start_marker) {
-      gsize prefix_len = strlen("===VIEWMD_START===\n");
+      gsize prefix_len = strlen("===LUMENEH_START===\n");
       gchar *base64_data = g_strndup(start_marker + prefix_len, end_marker - (start_marker + prefix_len));
       
       gsize decoded_len = 0;
@@ -246,7 +246,7 @@ gchar *remote_ssh_fetch_image_asset(const RemoteSSHLocation *doc_loc,
   g_free(remote_image_path);
 
   /* Build local cache directory */
-  cache_dir = g_build_filename(g_get_user_cache_dir(), "viewmd", "remote_cache", NULL);
+  cache_dir = g_build_filename(g_get_user_cache_dir(), "lumeneh", "remote_cache", NULL);
   g_mkdir_with_parents(cache_dir, 0700);
 
   sha1_hex = g_compute_checksum_for_string(G_CHECKSUM_SHA1, relative_src, -1);
@@ -285,9 +285,9 @@ gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc, GPtrArray **out_items
   }
 
   if (!loc->path || loc->path[0] == '\0') {
-    remote_cmd = g_strdup("echo '---VIEWMD_START---' && /bin/ls -1p && echo '---VIEWMD_END---'");
+    remote_cmd = g_strdup("echo '---LUMENEH_START---' && /bin/ls -1p && echo '---LUMENEH_END---'");
   } else {
-    remote_cmd = g_strdup_printf("echo '---VIEWMD_START---' && /bin/ls -1p '%s' && echo '---VIEWMD_END---'", loc->path);
+    remote_cmd = g_strdup_printf("echo '---LUMENEH_START---' && /bin/ls -1p '%s' && echo '---LUMENEH_END---'", loc->path);
   }
 
   args = g_ptr_array_new_with_free_func(g_free);
@@ -325,11 +325,11 @@ gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc, GPtrArray **out_items
     gboolean in_data = FALSE;
     for (gint i = 0; lines[i] != NULL; i++) {
       gchar *line = g_strstrip(lines[i]);
-      if (g_strcmp0(line, "---VIEWMD_START---") == 0) {
+      if (g_strcmp0(line, "---LUMENEH_START---") == 0) {
         in_data = TRUE;
         continue;
       }
-      if (g_strcmp0(line, "---VIEWMD_END---") == 0) {
+      if (g_strcmp0(line, "---LUMENEH_END---") == 0) {
         break;
       }
       if (in_data && line[0] != '\0') {

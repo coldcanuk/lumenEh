@@ -1,11 +1,11 @@
-Name:           viewmd
+Name:           lumeneh
 Version:        @VERSION@
 Release:        1%{?dist}
-Summary:        Lightweight GTK3 markdown viewer
+Summary:        lumenEh native GTK3 markdown viewer
 
 License:        GPL-3.0-or-later
 URL:            @URL@
-Source0:        viewmd-%{version}.tar.gz
+Source0:        lumeneh-%{version}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -15,10 +15,10 @@ BuildRequires:  gtk3-devel
 Requires:       gtk3
 
 %description
-ViewMD is a lightweight native GTK3 markdown viewer.
+lumenEh is a native GTK3 markdown viewer for local and remote (SSH) files.
 
 %prep
-%autosetup -n viewmd-%{version}
+%autosetup -n lumeneh-%{version}
 
 %build
 make %{?_smp_mflags}
@@ -28,9 +28,9 @@ rm -rf %{buildroot}
 make install DESTDIR=%{buildroot} PREFIX=%{_prefix}
 
 %files
-%{_bindir}/viewmd
-%{_datadir}/applications/viewmd.desktop
+%{_bindir}/lumeneh
+%{_datadir}/applications/lumeneh.desktop
 
 %changelog
-* Thu Jan 01 1970 ViewMD Packager <noreply@example.com> - @VERSION@-1
+* Thu Jan 01 1970 lumenEh Packager <noreply@example.com> - @VERSION@-1
 - Initial package
