@@ -1,53 +1,53 @@
-#ifndef MARKYD_CODE_HIGHLIGHT_H
-#define MARKYD_CODE_HIGHLIGHT_H
+#ifndef LUMENEH_CODE_HIGHLIGHT_H
+#define LUMENEH_CODE_HIGHLIGHT_H
 
 #include <glib.h>
 
-#define MARKYD_TAG_CODE_KW_A "code_kw_a"
-#define MARKYD_TAG_CODE_KW_B "code_kw_b"
-#define MARKYD_TAG_CODE_KW_C "code_kw_c"
-#define MARKYD_TAG_CODE_LITERAL "code_literal"
+#define LUMENEH_TAG_CODE_KW_A "code_kw_a"
+#define LUMENEH_TAG_CODE_KW_B "code_kw_b"
+#define LUMENEH_TAG_CODE_KW_C "code_kw_c"
+#define LUMENEH_TAG_CODE_LITERAL "code_literal"
 
-typedef struct _MarkydKeywordGroup {
+typedef struct _LumenehKeywordGroup {
   const gchar *tag_name;
   const gchar *const *keywords;
   gsize keyword_count;
-} MarkydKeywordGroup;
+} LumenehKeywordGroup;
 
-typedef struct _MarkydCodeScanState {
+typedef struct _LumenehCodeScanState {
   guint32 flags;
-} MarkydCodeScanState;
+} LumenehCodeScanState;
 
-typedef void (*MarkydCodeTokenCallback)(gint start_char_offset,
+typedef void (*LumenehCodeTokenCallback)(gint start_char_offset,
                                         gint end_char_offset,
                                         const gchar *tag_name,
                                         gpointer user_data);
 
-struct _MarkydLanguageHighlight;
+struct _LumenehLanguageHighlight;
 
-typedef void (*MarkydCodeScanLineFunc)(
-    const struct _MarkydLanguageHighlight *language, const gchar *line,
-    MarkydCodeScanState *state, MarkydCodeTokenCallback on_token,
+typedef void (*LumenehCodeScanLineFunc)(
+    const struct _LumenehLanguageHighlight *language, const gchar *line,
+    LumenehCodeScanState *state, LumenehCodeTokenCallback on_token,
     gpointer user_data);
 
-typedef struct _MarkydLanguageHighlight {
+typedef struct _LumenehLanguageHighlight {
   const gchar *language;
-  const MarkydKeywordGroup *groups;
+  const LumenehKeywordGroup *groups;
   gsize group_count;
-  MarkydCodeScanLineFunc scan_line;
-} MarkydLanguageHighlight;
+  LumenehCodeScanLineFunc scan_line;
+} LumenehLanguageHighlight;
 
 /* Lookup by optional fenced code language (case-insensitive), e.g. "c". */
-const MarkydLanguageHighlight *
-markyd_code_lookup_language(const gchar *language);
+const LumenehLanguageHighlight *
+lumeneh_code_lookup_language(const gchar *language);
 
 /* Reset scan state, e.g. when entering/exiting fenced code blocks. */
-void markyd_code_scan_state_reset(MarkydCodeScanState *state);
+void lumeneh_code_scan_state_reset(LumenehCodeScanState *state);
 
 /* Scan one code line and emit syntax token ranges via callback. */
-void markyd_code_scan_line(const MarkydLanguageHighlight *language,
-                           const gchar *line, MarkydCodeScanState *state,
-                           MarkydCodeTokenCallback on_token,
+void lumeneh_code_scan_line(const LumenehLanguageHighlight *language,
+                           const gchar *line, LumenehCodeScanState *state,
+                           LumenehCodeTokenCallback on_token,
                            gpointer user_data);
 
-#endif /* MARKYD_CODE_HIGHLIGHT_H */
+#endif /* LUMENEH_CODE_HIGHLIGHT_H */

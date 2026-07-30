@@ -1,30 +1,30 @@
-#ifndef MARKYD_APP_H
-#define MARKYD_APP_H
+#ifndef LUMENEH_APP_H
+#define LUMENEH_APP_H
 
 #include <gtk/gtk.h>
 
 /* Forward declarations */
-typedef struct _MarkydWindow MarkydWindow;
-typedef struct _MarkydEditor MarkydEditor;
+typedef struct _LumenehWindow LumenehWindow;
+typedef struct _LumenehEditor LumenehEditor;
 
 /* Application state */
-typedef struct _MarkydApp {
+typedef struct _LumenehApp {
   GtkApplication *gtk_app;
-  MarkydWindow *window;
-} MarkydApp;
+  LumenehWindow *window;
+} LumenehApp;
 
 /* Global app instance */
-extern MarkydApp *app;
+extern LumenehApp *app;
 
 /* Lifecycle */
-MarkydApp *markyd_app_new(void);
-void markyd_app_free(MarkydApp *app);
-int markyd_app_run(MarkydApp *app, int argc, char **argv);
+LumenehApp *lumeneh_app_new(void);
+void lumeneh_app_free(LumenehApp *app);
+int lumeneh_app_run(LumenehApp *app, int argc, char **argv);
 
 /* Document management */
-gboolean markyd_app_open_file(MarkydApp *app, const gchar *path);
+gboolean lumeneh_app_open_file(LumenehApp *app, const gchar *path);
 
 /* Utility */
-const gchar *markyd_app_get_current_path(MarkydApp *app);
+const gchar *lumeneh_app_get_current_path(LumenehApp *app);
 
-#endif /* MARKYD_APP_H */
+#endif /* LUMENEH_APP_H */

@@ -15,8 +15,8 @@ typedef struct {
   gint table_col;
 } SearchMatch;
 
-#define TAG_SEARCH_MATCH "viewmd_search_match"
-#define TAG_SEARCH_CURRENT "viewmd_search_current"
+#define TAG_SEARCH_MATCH "lumeneh_search_match"
+#define TAG_SEARCH_CURRENT "lumeneh_search_current"
 
 static void on_open_clicked(GtkButton *button, gpointer user_data);
 static void on_open_remote_clicked(GtkButton *button, gpointer user_data);
@@ -28,19 +28,19 @@ static void on_search_next_clicked(GtkButton *button, gpointer user_data);
 static gboolean on_search_entry_key_press(GtkWidget *widget, GdkEventKey *event,
                                           gpointer user_data);
 static void on_editor_buffer_changed(GtkTextBuffer *buffer, gpointer user_data);
-static void ensure_search_tags(MarkydWindow *self);
-static void update_search_tag_styles(MarkydWindow *self, const gchar *match_bg,
+static void ensure_search_tags(LumenehWindow *self);
+static void update_search_tag_styles(LumenehWindow *self, const gchar *match_bg,
                                      const gchar *match_fg,
                                      const gchar *current_bg,
                                      const gchar *current_fg);
-static void clear_search_matches(MarkydWindow *self);
-static void update_search_matches(MarkydWindow *self);
-static void jump_to_search_match(MarkydWindow *self, gint index,
+static void clear_search_matches(LumenehWindow *self);
+static void update_search_matches(LumenehWindow *self);
+static void jump_to_search_match(LumenehWindow *self, gint index,
                                  gboolean scroll_to_match);
-static void clear_table_search_highlight(MarkydWindow *self, gboolean clear_match,
+static void clear_table_search_highlight(LumenehWindow *self, gboolean clear_match,
                                          gboolean clear_current);
-static void apply_table_search_match_highlight(MarkydWindow *self);
-static gboolean resolve_table_match_location(MarkydWindow *self, gint start_offset,
+static void apply_table_search_match_highlight(LumenehWindow *self);
+static gboolean resolve_table_match_location(LumenehWindow *self, gint start_offset,
                                              gint end_offset,
                                              GtkTextChildAnchor **out_anchor,
                                              gint *out_row, gint *out_col);
@@ -48,9 +48,9 @@ static GtkWidget *lookup_table_cell_widget(GtkWidget *table_widget, gint row,
                                            gint col);
 static void set_table_cell_highlight(GtkWidget *cell, gboolean match,
                                      gboolean current);
-static gboolean scroll_to_table_cell(MarkydWindow *self, GtkWidget *cell);
-static void show_search_ui(MarkydWindow *self);
-static void hide_search_ui(MarkydWindow *self);
+static gboolean scroll_to_table_cell(LumenehWindow *self, GtkWidget *cell);
+static void show_search_ui(LumenehWindow *self);
+static void hide_search_ui(LumenehWindow *self);
 static gboolean on_key_press_event(GtkWidget *widget, GdkEventKey *event,
                                    gpointer user_data);
 static gboolean on_configure_event(GtkWidget *widget, GdkEventConfigure *event,
@@ -66,17 +66,17 @@ static void on_theme_changed(GtkComboBoxText *combo, gpointer user_data);
 static gchar *rgba_to_hex(const GdkRGBA *rgba);
 static void init_color_button(GtkColorButton *btn, const gchar *color_str);
 static void on_color_set(GtkColorButton *btn, gpointer user_data);
-static GtkWidget *create_settings_dialog(MarkydApp *app);
+static GtkWidget *create_settings_dialog(LumenehApp *app);
 
 static gboolean geometry_debug_enabled(void) {
-  const gchar *v = g_getenv("VIEWMD_DEBUG_GEOMETRY");
+  const gchar *v = g_getenv("LUMENEH_DEBUG_GEOMETRY");
   if (!v) {
     v = g_getenv("TRAYMD_DEBUG_GEOMETRY");
   }
   return v && v[0] != '\0' && g_strcmp0(v, "0") != 0;
 }
 
-static void ensure_search_tags(MarkydWindow *self) {
+static void ensure_search_tags(LumenehWindow *self) {
   GtkTextTagTable *table;
 
   if (!self || !self->editor || !self->editor->buffer) {
@@ -98,7 +98,7 @@ static void ensure_search_tags(MarkydWindow *self) {
   }
 }
 
-static void update_search_tag_styles(MarkydWindow *self, const gchar *match_bg,
+static void update_search_tag_styles(LumenehWindow *self, const gchar *match_bg,
                                      const gchar *match_fg,
                                      const gchar *current_bg,
                                      const gchar *current_fg) {
@@ -125,7 +125,7 @@ static void update_search_tag_styles(MarkydWindow *self, const gchar *match_bg,
   }
 }
 
-static void clear_search_matches(MarkydWindow *self) {
+static void clear_search_matches(LumenehWindow *self) {
   GtkTextIter start;
   GtkTextIter end;
 
@@ -166,19 +166,19 @@ static void set_table_cell_highlight(GtkWidget *cell, gboolean match,
 
   style = gtk_widget_get_style_context(cell);
   if (match) {
-    gtk_style_context_add_class(style, VIEWMD_TABLE_CELL_MATCH_CLASS);
+    gtk_style_context_add_class(style, LUMENEH_TABLE_CELL_MATCH_CLASS);
   } else {
-    gtk_style_context_remove_class(style, VIEWMD_TABLE_CELL_MATCH_CLASS);
+    gtk_style_context_remove_class(style, LUMENEH_TABLE_CELL_MATCH_CLASS);
   }
 
   if (current) {
-    gtk_style_context_add_class(style, VIEWMD_TABLE_CELL_CURRENT_CLASS);
+    gtk_style_context_add_class(style, LUMENEH_TABLE_CELL_CURRENT_CLASS);
   } else {
-    gtk_style_context_remove_class(style, VIEWMD_TABLE_CELL_CURRENT_CLASS);
+    gtk_style_context_remove_class(style, LUMENEH_TABLE_CELL_CURRENT_CLASS);
   }
 }
 
-static gboolean scroll_to_table_cell(MarkydWindow *self, GtkWidget *cell) {
+static gboolean scroll_to_table_cell(LumenehWindow *self, GtkWidget *cell) {
   gint x = 0;
   gint y = 0;
   gdouble doc_x;
@@ -240,9 +240,9 @@ static GtkWidget *lookup_table_cell_widget(GtkWidget *table_widget, gint row,
     for (GList *g = grid_children; g != NULL; g = g->next) {
       GtkWidget *cell = GTK_WIDGET(g->data);
       gint cell_row = GPOINTER_TO_INT(
-          g_object_get_data(G_OBJECT(cell), VIEWMD_TABLE_CELL_ROW_DATA));
+          g_object_get_data(G_OBJECT(cell), LUMENEH_TABLE_CELL_ROW_DATA));
       gint cell_col = GPOINTER_TO_INT(
-          g_object_get_data(G_OBJECT(cell), VIEWMD_TABLE_CELL_COL_DATA));
+          g_object_get_data(G_OBJECT(cell), LUMENEH_TABLE_CELL_COL_DATA));
       if (cell_row == row && cell_col == col) {
         found = cell;
         break;
@@ -255,7 +255,7 @@ static GtkWidget *lookup_table_cell_widget(GtkWidget *table_widget, gint row,
   return found;
 }
 
-static void clear_table_search_highlight(MarkydWindow *self, gboolean clear_match,
+static void clear_table_search_highlight(LumenehWindow *self, gboolean clear_match,
                                          gboolean clear_current) {
   GtkTextIter iter;
   GtkTextIter end;
@@ -268,9 +268,9 @@ static void clear_table_search_highlight(MarkydWindow *self, gboolean clear_matc
   while (!gtk_text_iter_equal(&iter, &end)) {
     GtkTextChildAnchor *anchor = gtk_text_iter_get_child_anchor(&iter);
     if (anchor &&
-        g_object_get_data(G_OBJECT(anchor), VIEWMD_TABLE_ANCHOR_DATA) != NULL) {
+        g_object_get_data(G_OBJECT(anchor), LUMENEH_TABLE_ANCHOR_DATA) != NULL) {
       GtkWidget *table_widget =
-          g_object_get_data(G_OBJECT(anchor), VIEWMD_TABLE_WIDGET_DATA);
+          g_object_get_data(G_OBJECT(anchor), LUMENEH_TABLE_WIDGET_DATA);
       if (table_widget && GTK_IS_CONTAINER(table_widget)) {
         GList *wrapper_children =
             gtk_container_get_children(GTK_CONTAINER(table_widget));
@@ -284,11 +284,11 @@ static void clear_table_search_highlight(MarkydWindow *self, gboolean clear_matc
             GtkWidget *cell = GTK_WIDGET(g->data);
             if (clear_match) {
               gtk_style_context_remove_class(gtk_widget_get_style_context(cell),
-                                             VIEWMD_TABLE_CELL_MATCH_CLASS);
+                                             LUMENEH_TABLE_CELL_MATCH_CLASS);
             }
             if (clear_current) {
               gtk_style_context_remove_class(gtk_widget_get_style_context(cell),
-                                             VIEWMD_TABLE_CELL_CURRENT_CLASS);
+                                             LUMENEH_TABLE_CELL_CURRENT_CLASS);
             }
           }
           g_list_free(grid_children);
@@ -300,7 +300,7 @@ static void clear_table_search_highlight(MarkydWindow *self, gboolean clear_matc
   }
 }
 
-static gboolean resolve_table_match_location(MarkydWindow *self, gint start_offset,
+static gboolean resolve_table_match_location(LumenehWindow *self, gint start_offset,
                                              gint end_offset,
                                              GtkTextChildAnchor **out_anchor,
                                              gint *out_row, gint *out_col) {
@@ -326,8 +326,8 @@ static gboolean resolve_table_match_location(MarkydWindow *self, gint start_offs
   while (!gtk_text_iter_equal(&iter, &end)) {
     GtkTextChildAnchor *anchor = gtk_text_iter_get_child_anchor(&iter);
     if (anchor) {
-      ViewmdTableSearchIndex *index = g_object_get_data(
-          G_OBJECT(anchor), VIEWMD_TABLE_SEARCH_INDEX_DATA);
+      LumenehTableSearchIndex *index = g_object_get_data(
+          G_OBJECT(anchor), LUMENEH_TABLE_SEARCH_INDEX_DATA);
       if (index && start_offset < index->end_offset &&
           end_offset > index->start_offset) {
         if (out_anchor) {
@@ -335,10 +335,10 @@ static gboolean resolve_table_match_location(MarkydWindow *self, gint start_offs
         }
 
         if (index->cells) {
-          ViewmdTableSearchCellRange *overlap_cell = NULL;
+          LumenehTableSearchCellRange *overlap_cell = NULL;
           for (guint i = 0; i < index->cells->len; i++) {
-            ViewmdTableSearchCellRange *cell =
-                &g_array_index(index->cells, ViewmdTableSearchCellRange, i);
+            LumenehTableSearchCellRange *cell =
+                &g_array_index(index->cells, LumenehTableSearchCellRange, i);
             if (start_offset >= cell->start_offset && start_offset < cell->end_offset) {
               if (out_row) {
                 *out_row = cell->row;
@@ -372,7 +372,7 @@ static gboolean resolve_table_match_location(MarkydWindow *self, gint start_offs
   return FALSE;
 }
 
-static void apply_table_search_match_highlight(MarkydWindow *self) {
+static void apply_table_search_match_highlight(LumenehWindow *self) {
   if (!self || !self->search_matches) {
     return;
   }
@@ -389,7 +389,7 @@ static void apply_table_search_match_highlight(MarkydWindow *self) {
     }
 
     table_widget =
-        g_object_get_data(G_OBJECT(match->table_anchor), VIEWMD_TABLE_WIDGET_DATA);
+        g_object_get_data(G_OBJECT(match->table_anchor), LUMENEH_TABLE_WIDGET_DATA);
     cell = lookup_table_cell_widget(table_widget, match->table_row, match->table_col);
     if (cell) {
       set_table_cell_highlight(cell, TRUE, FALSE);
@@ -397,7 +397,7 @@ static void apply_table_search_match_highlight(MarkydWindow *self) {
   }
 }
 
-static void jump_to_search_match(MarkydWindow *self, gint index,
+static void jump_to_search_match(LumenehWindow *self, gint index,
                                  gboolean scroll_to_match) {
   GtkTextIter start;
   GtkTextIter end;
@@ -421,7 +421,7 @@ static void jump_to_search_match(MarkydWindow *self, gint index,
   match = &g_array_index(self->search_matches, SearchMatch, index);
   if (match->table_anchor && match->table_row >= 0 && match->table_col >= 0) {
     GtkWidget *table_widget =
-        g_object_get_data(G_OBJECT(match->table_anchor), VIEWMD_TABLE_WIDGET_DATA);
+        g_object_get_data(G_OBJECT(match->table_anchor), LUMENEH_TABLE_WIDGET_DATA);
     GtkWidget *cell =
         lookup_table_cell_widget(table_widget, match->table_row, match->table_col);
     if (cell) {
@@ -442,7 +442,7 @@ static void jump_to_search_match(MarkydWindow *self, gint index,
       gboolean scrolled_to_cell = FALSE;
       if (match->table_row >= 0 && match->table_col >= 0) {
         GtkWidget *table_widget = g_object_get_data(G_OBJECT(match->table_anchor),
-                                                    VIEWMD_TABLE_WIDGET_DATA);
+                                                    LUMENEH_TABLE_WIDGET_DATA);
         GtkWidget *cell = lookup_table_cell_widget(table_widget, match->table_row,
                                                    match->table_col);
         if (cell) {
@@ -468,7 +468,7 @@ static void jump_to_search_match(MarkydWindow *self, gint index,
   g_free(status);
 }
 
-static void update_search_matches(MarkydWindow *self) {
+static void update_search_matches(LumenehWindow *self) {
   const gchar *query;
   GtkTextIter iter;
   GtkTextIter match_start;
@@ -516,7 +516,7 @@ static void update_search_matches(MarkydWindow *self) {
   jump_to_search_match(self, 0, TRUE);
 }
 
-static void show_search_ui(MarkydWindow *self) {
+static void show_search_ui(LumenehWindow *self) {
   if (!self || !self->search_revealer || !self->search_entry) {
     return;
   }
@@ -530,7 +530,7 @@ static void show_search_ui(MarkydWindow *self) {
   }
 }
 
-static void hide_search_ui(MarkydWindow *self) {
+static void hide_search_ui(LumenehWindow *self) {
   if (!self || !self->search_revealer || !self->search_entry) {
     return;
   }
@@ -538,17 +538,17 @@ static void hide_search_ui(MarkydWindow *self) {
   gtk_revealer_set_reveal_child(GTK_REVEALER(self->search_revealer), FALSE);
   gtk_entry_set_text(GTK_ENTRY(self->search_entry), "");
   clear_search_matches(self);
-  markyd_editor_focus(self->editor);
+  lumeneh_editor_focus(self->editor);
 }
 
 static void on_search_changed(GtkEditable *editable, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   (void)editable;
   update_search_matches(self);
 }
 
 static void on_search_prev_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   gint index;
 
   (void)button;
@@ -565,7 +565,7 @@ static void on_search_prev_clicked(GtkButton *button, gpointer user_data) {
 }
 
 static void on_search_next_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   gint index;
 
   (void)button;
@@ -583,7 +583,7 @@ static void on_search_next_clicked(GtkButton *button, gpointer user_data) {
 
 static gboolean on_search_entry_key_press(GtkWidget *widget, GdkEventKey *event,
                                           gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   gboolean shift_pressed;
 
   (void)widget;
@@ -611,7 +611,7 @@ static gboolean on_search_entry_key_press(GtkWidget *widget, GdkEventKey *event,
 }
 
 static void on_editor_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   (void)buffer;
 
   if (!self || !self->search_revealer || !self->search_entry) {
@@ -632,15 +632,15 @@ static void on_editor_buffer_changed(GtkTextBuffer *buffer, gpointer user_data) 
 
 static void on_window_destroy(GtkWidget *widget, gpointer user_data) {
   (void)widget;
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   if (self) {
     self->window = NULL;
   }
   gtk_main_quit();
 }
 
-MarkydWindow *markyd_window_new(MarkydApp *app) {
-  MarkydWindow *self = g_new0(MarkydWindow, 1);
+LumenehWindow *lumeneh_window_new(LumenehApp *app) {
+  LumenehWindow *self = g_new0(LumenehWindow, 1);
   GtkWidget *left_buttons;
   GtkWidget *main_box;
   GtkWidget *search_box;
@@ -648,7 +648,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   self->app = app;
 
   self->window = gtk_application_window_new(app->gtk_app);
-  gtk_window_set_title(GTK_WINDOW(self->window), "ViewMD");
+  gtk_window_set_title(GTK_WINDOW(self->window), "lumenEh");
 
   gtk_window_set_default_size(GTK_WINDOW(self->window), config->window_width,
                               config->window_height);
@@ -659,7 +659,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   }
 
   if (geometry_debug_enabled()) {
-    g_printerr("ViewMD geometry init: x=%d y=%d w=%d h=%d maximized=%d\n",
+    g_printerr("lumenEh geometry init: x=%d y=%d w=%d h=%d maximized=%d\n",
                config->window_x, config->window_y, config->window_width,
                config->window_height, config->window_maximized);
   }
@@ -680,7 +680,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(self->header_bar), TRUE);
   gtk_window_set_titlebar(GTK_WINDOW(self->window), self->header_bar);
 
-  self->lbl_title = gtk_label_new("ViewMD");
+  self->lbl_title = gtk_label_new("lumenEh");
   gtk_widget_set_halign(self->lbl_title, GTK_ALIGN_CENTER);
   gtk_header_bar_set_custom_title(GTK_HEADER_BAR(self->header_bar),
                                   self->lbl_title);
@@ -787,7 +787,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   self->search_matches = g_array_new(FALSE, FALSE, sizeof(SearchMatch));
   self->search_current_index = -1;
 
-  markyd_window_apply_css(self);
+  lumeneh_window_apply_css(self);
 
   gtk_widget_show_all(self->window);
   gtk_widget_hide(self->notebook);
@@ -795,7 +795,7 @@ MarkydWindow *markyd_window_new(MarkydApp *app) {
   return self;
 }
 
-void markyd_window_apply_css(MarkydWindow *self) {
+void lumeneh_window_apply_css(LumenehWindow *self) {
   static GtkCssProvider *css = NULL;
   gchar *css_str;
   const gchar *bg;
@@ -905,28 +905,28 @@ void markyd_window_apply_css(MarkydWindow *self) {
       "window {"
       "  background-color: %s;"
       "}"
-      ".viewmd-table-cell {"
+      ".lumeneh-table-cell {"
       "  background-color: %s;"
       "  border-style: solid;"
       "  border-width: 1px;"
       "  border-color: %s;"
       "}"
-      ".viewmd-table-header-cell {"
+      ".lumeneh-table-header-cell {"
       "  background-color: %s;"
       "}"
-      ".viewmd-table-cell label {"
+      ".lumeneh-table-cell label {"
       "  color: %s;"
       "}"
-      ".viewmd-table-cell." VIEWMD_TABLE_CELL_MATCH_CLASS " {"
+      ".lumeneh-table-cell." LUMENEH_TABLE_CELL_MATCH_CLASS " {"
       "  background-color: %s;"
       "}"
-      ".viewmd-table-cell." VIEWMD_TABLE_CELL_MATCH_CLASS " label {"
+      ".lumeneh-table-cell." LUMENEH_TABLE_CELL_MATCH_CLASS " label {"
       "  color: %s;"
       "}"
-      ".viewmd-table-cell." VIEWMD_TABLE_CELL_CURRENT_CLASS " {"
+      ".lumeneh-table-cell." LUMENEH_TABLE_CELL_CURRENT_CLASS " {"
       "  background-color: %s;"
       "}"
-      ".viewmd-table-cell." VIEWMD_TABLE_CELL_CURRENT_CLASS " label {"
+      ".lumeneh-table-cell." LUMENEH_TABLE_CELL_CURRENT_CLASS " label {"
       "  color: %s;"
       "}",
       config->font_family, config->font_size, bg, fg, fg, bg, fg, fg, sel_bg, bg,
@@ -945,7 +945,7 @@ void markyd_window_apply_css(MarkydWindow *self) {
 
 }
 
-void markyd_window_free(MarkydWindow *self) {
+void lumeneh_window_free(LumenehWindow *self) {
   if (!self)
     return;
 
@@ -957,9 +957,9 @@ void markyd_window_free(MarkydWindow *self) {
   GList *l = self->tabs;
   while (l != NULL) {
     GList *next = l->next;
-    MarkydTab *tab = (MarkydTab *)l->data;
+    LumenehTab *tab = (LumenehTab *)l->data;
     if (tab->editor) {
-      markyd_editor_free(tab->editor);
+      lumeneh_editor_free(tab->editor);
     }
     g_free(tab->file_path);
     g_free(tab);
@@ -975,7 +975,7 @@ void markyd_window_free(MarkydWindow *self) {
   g_free(self);
 }
 
-void markyd_window_show(MarkydWindow *self) {
+void lumeneh_window_show(LumenehWindow *self) {
   gtk_widget_show(self->window);
   if (!config->window_maximized && config->window_x >= 0 && config->window_y >= 0) {
     gtk_window_move(GTK_WINDOW(self->window), config->window_x, config->window_y);
@@ -983,22 +983,22 @@ void markyd_window_show(MarkydWindow *self) {
   gtk_window_present(GTK_WINDOW(self->window));
 }
 
-void markyd_window_hide(MarkydWindow *self) { gtk_widget_hide(self->window); }
+void lumeneh_window_hide(LumenehWindow *self) { gtk_widget_hide(self->window); }
 
-void markyd_window_toggle(MarkydWindow *self) {
-  if (markyd_window_is_visible(self)) {
-    markyd_window_hide(self);
+void lumeneh_window_toggle(LumenehWindow *self) {
+  if (lumeneh_window_is_visible(self)) {
+    lumeneh_window_hide(self);
   } else {
-    markyd_window_show(self);
+    lumeneh_window_show(self);
   }
 }
 
-gboolean markyd_window_is_visible(MarkydWindow *self) {
+gboolean lumeneh_window_is_visible(LumenehWindow *self) {
   return gtk_widget_get_visible(self->window);
 }
 
 static void on_open_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   GtkWidget *dialog;
   GtkFileFilter *md_filter;
   gint response;
@@ -1025,7 +1025,7 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
   if (response == GTK_RESPONSE_ACCEPT) {
     gchar *path = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
     if (path) {
-      if (!markyd_app_open_file(self->app, path)) {
+      if (!lumeneh_app_open_file(self->app, path)) {
         GtkWidget *error_dialog = gtk_message_dialog_new(
             GTK_WINDOW(self->window),
             GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
@@ -1043,7 +1043,7 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
 }
 
 typedef struct {
-  MarkydWindow *window;
+  LumenehWindow *window;
   GtkWidget *dialog;
   GtkWidget *entry_user;
   GtkWidget *entry_host;
@@ -1155,7 +1155,7 @@ static void update_paths_combo(RemoteConnectionUI *ui, const gchar *host_uri) {
   gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(ui->combo_paths));
   gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_paths), ""); // empty choice
   if (!host_uri) return;
-  ViewmdBookmarkHost *h = viewmd_bookmark_host_get(host_uri);
+  LumenehBookmarkHost *h = lumeneh_bookmark_host_get(host_uri);
   if (h && h->paths) {
     for (guint i = 0; i < h->paths->len; i++) {
       gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_paths), g_ptr_array_index(h->paths, i));
@@ -1167,11 +1167,11 @@ static void on_remote_host_del_clicked(GtkButton *button, gpointer user_data) {
   RemoteConnectionUI *ui = (RemoteConnectionUI *)user_data;
   (void)button;
   gchar *active_id = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts));
-  if (active_id && viewmd_bookmark_host_remove(active_id)) {
+  if (active_id && lumeneh_bookmark_host_remove(active_id)) {
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(ui->combo_hosts));
-    GPtrArray *bms = viewmd_bookmarks_get_hosts();
+    GPtrArray *bms = lumeneh_bookmarks_get_hosts();
     for (guint i = 0; bms && i < bms->len; i++) {
-      ViewmdBookmarkHost *bm = g_ptr_array_index(bms, i);
+      LumenehBookmarkHost *bm = g_ptr_array_index(bms, i);
       gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), bm->host_uri);
     }
     update_paths_combo(ui, NULL);
@@ -1194,9 +1194,9 @@ static void on_remote_host_add_clicked(GtkButton *button, gpointer user_data) {
   gchar *uri = g_string_free(s, FALSE);
   
   gboolean exists = FALSE;
-  GPtrArray *bms = viewmd_bookmarks_get_hosts();
+  GPtrArray *bms = lumeneh_bookmarks_get_hosts();
   for (guint i = 0; bms && i < bms->len; i++) {
-    ViewmdBookmarkHost *bm = g_ptr_array_index(bms, i);
+    LumenehBookmarkHost *bm = g_ptr_array_index(bms, i);
     if (g_strcmp0(bm->host_uri, uri) == 0) {
       exists = TRUE;
       break;
@@ -1204,7 +1204,7 @@ static void on_remote_host_add_clicked(GtkButton *button, gpointer user_data) {
   }
   
   if (!exists) {
-    viewmd_bookmark_host_add(uri, uri);
+    lumeneh_bookmark_host_add(uri, uri);
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), uri);
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(ui->combo_hosts), uri);
   }
@@ -1263,7 +1263,7 @@ static void on_remote_path_del_clicked(GtkButton *button, gpointer user_data) {
   gchar *path = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(ui->combo_paths));
   
   if (host_uri && path && path[0] != '\0') {
-    if (viewmd_bookmark_path_remove(host_uri, path)) {
+    if (lumeneh_bookmark_path_remove(host_uri, path)) {
       update_paths_combo(ui, host_uri);
     }
   }
@@ -1293,7 +1293,7 @@ static void on_remote_host_entry_changed(GtkEditable *editable, gpointer user_da
 }
 
 static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   (void)button;
   
   RemoteConnectionUI *ui = g_new0(RemoteConnectionUI, 1);
@@ -1318,9 +1318,9 @@ static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
   gtk_box_pack_start(GTK_BOX(hbox_host), lbl_host, FALSE, FALSE, 0);
   
   ui->combo_hosts = gtk_combo_box_text_new();
-  GPtrArray *hosts = viewmd_bookmarks_get_hosts();
+  GPtrArray *hosts = lumeneh_bookmarks_get_hosts();
   for (guint i = 0; hosts && i < hosts->len; i++) {
-    ViewmdBookmarkHost *h = g_ptr_array_index(hosts, i);
+    LumenehBookmarkHost *h = g_ptr_array_index(hosts, i);
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(ui->combo_hosts), h->host_uri);
   }
   g_signal_connect(ui->combo_hosts, "changed", G_CALLBACK(on_remote_host_changed), ui);
@@ -1408,7 +1408,7 @@ static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
   g_signal_connect(ui->btn_open, "clicked", G_CALLBACK(on_remote_open_clicked), ui);
   gtk_box_pack_start(GTK_BOX(hbox_actions), ui->btn_open, FALSE, FALSE, 0);
   
-  const gchar *curr = markyd_app_get_current_path(self->app);
+  const gchar *curr = lumeneh_app_get_current_path(self->app);
   if (curr && remote_ssh_is_remote_uri(curr)) {
     gtk_entry_set_text(GTK_ENTRY(ui->entry_host), curr); // Auto-parse
   }
@@ -1417,7 +1417,7 @@ static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
   
   gint response = gtk_dialog_run(GTK_DIALOG(ui->dialog));
   if (response == GTK_RESPONSE_ACCEPT && ui->validated_uri) {
-    if (!markyd_app_open_file(self->app, ui->validated_uri)) {
+    if (!lumeneh_app_open_file(self->app, ui->validated_uri)) {
       GtkWidget *error_dialog = gtk_message_dialog_new(
           GTK_WINDOW(self->window),
           GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
@@ -1437,19 +1437,19 @@ static void on_open_remote_clicked(GtkButton *button, gpointer user_data) {
 }
 
 static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   const gchar *current;
   gchar *path;
 
   (void)button;
 
-  current = markyd_app_get_current_path(self->app);
+  current = lumeneh_app_get_current_path(self->app);
   if (!current || current[0] == '\0') {
     return;
   }
 
   path = g_strdup(current);
-  if (!markyd_app_open_file(self->app, path)) {
+  if (!lumeneh_app_open_file(self->app, path)) {
     GtkWidget *error_dialog = gtk_message_dialog_new(
         GTK_WINDOW(self->window),
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
@@ -1463,7 +1463,7 @@ static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
 }
 
 static void on_settings_clicked(GtkButton *button, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   GtkWidget *dialog;
   gint response;
 
@@ -1474,9 +1474,9 @@ static void on_settings_clicked(GtkButton *button, gpointer user_data) {
 
   if (response == GTK_RESPONSE_APPLY || response == GTK_RESPONSE_OK) {
     config_save(config);
-    markyd_window_apply_css(self);
+    lumeneh_window_apply_css(self);
     markdown_update_accent_tags(self->editor->buffer);
-    markyd_editor_refresh(self->editor);
+    lumeneh_editor_refresh(self->editor);
   }
 
   gtk_widget_destroy(dialog);
@@ -1484,7 +1484,7 @@ static void on_settings_clicked(GtkButton *button, gpointer user_data) {
 
 static gboolean on_key_press_event(GtkWidget *widget, GdkEventKey *event,
                                    gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
 
   if (!event || !self) {
     return FALSE;
@@ -1539,7 +1539,7 @@ static gboolean on_key_press_event(GtkWidget *widget, GdkEventKey *event,
 
 static gboolean on_configure_event(GtkWidget *widget, GdkEventConfigure *event,
                                    gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   (void)self;
 
   GdkWindow *gdk_window = gtk_widget_get_window(widget);
@@ -1579,15 +1579,15 @@ static gboolean on_configure_event(GtkWidget *widget, GdkEventConfigure *event,
     if (geometry_debug_enabled()) {
       if (have_extents) {
         g_printerr(
-            "ViewMD configure: event=%dx%d gtk=%dx%d saved=%dx%d frame=%dx%d at (%d,%d)\n",
+            "lumenEh configure: event=%dx%d gtk=%dx%d saved=%dx%d frame=%dx%d at (%d,%d)\n",
             event->width, event->height, gtk_w, gtk_h, width, height,
             frame_extents.width, frame_extents.height, x, y);
       } else {
-        g_printerr("ViewMD configure: event=%dx%d gtk=%dx%d saved=%dx%d at (%d,%d)\n",
+        g_printerr("lumenEh configure: event=%dx%d gtk=%dx%d saved=%dx%d at (%d,%d)\n",
                    event->width, event->height, gtk_w, gtk_h, width, height, x,
                    y);
       }
-      g_printerr("ViewMD saved: x=%d y=%d w=%d h=%d\n", config->window_x,
+      g_printerr("lumenEh saved: x=%d y=%d w=%d h=%d\n", config->window_x,
                  config->window_y, config->window_width, config->window_height);
     }
   }
@@ -1702,7 +1702,7 @@ static void on_color_set(GtkColorButton *btn, gpointer user_data) {
   *target = rgba_to_hex(&rgba);
 }
 
-static GtkWidget *create_settings_dialog(MarkydApp *app) {
+static GtkWidget *create_settings_dialog(LumenehApp *app) {
   GtkWidget *dialog;
   GtkWidget *content;
   GtkWidget *grid;
@@ -1717,7 +1717,7 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
   gint row = 0;
 
   dialog = gtk_dialog_new_with_buttons(
-      "ViewMD Settings", GTK_WINDOW(app->window->window),
+      "lumenEh Settings", GTK_WINDOW(app->window->window),
       GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT, "_Cancel",
       GTK_RESPONSE_CANCEL, "_Apply", GTK_RESPONSE_APPLY, NULL);
 
@@ -1858,13 +1858,13 @@ static GtkWidget *create_settings_dialog(MarkydApp *app) {
   return dialog;
 }
 
-static void update_window_title_for_tab(MarkydWindow *self) {
+static void update_window_title_for_tab(LumenehWindow *self) {
   gchar *title;
   if (!self || !self->window) return;
   
   if (!self->current_tab || !self->current_tab->file_path || self->current_tab->file_path[0] == '\0') {
-    gtk_window_set_title(GTK_WINDOW(self->window), "ViewMD");
-    gtk_label_set_text(GTK_LABEL(self->lbl_title), "ViewMD");
+    gtk_window_set_title(GTK_WINDOW(self->window), "lumenEh");
+    gtk_label_set_text(GTK_LABEL(self->lbl_title), "lumenEh");
     return;
   }
 
@@ -1874,18 +1874,18 @@ static void update_window_title_for_tab(MarkydWindow *self) {
     if (loc) {
       gchar *base = g_path_get_basename(loc->path);
       if (loc->user && loc->user[0] != '\0') {
-        title = g_strdup_printf("ViewMD - %s [%s@%s]", base, loc->user, loc->host);
+        title = g_strdup_printf("lumenEh - %s [%s@%s]", base, loc->user, loc->host);
       } else {
-        title = g_strdup_printf("ViewMD - %s [%s]", base, loc->host);
+        title = g_strdup_printf("lumenEh - %s [%s]", base, loc->host);
       }
       g_free(base);
       remote_ssh_location_free(loc);
     } else {
-      title = g_strdup_printf("ViewMD - %s", path);
+      title = g_strdup_printf("lumenEh - %s", path);
     }
   } else {
     gchar *base = g_path_get_basename(path);
-    title = g_strdup_printf("ViewMD - %s", base);
+    title = g_strdup_printf("lumenEh - %s", base);
     g_free(base);
   }
 
@@ -1895,7 +1895,7 @@ static void update_window_title_for_tab(MarkydWindow *self) {
 }
 
 static void on_notebook_switch_page(GtkNotebook *notebook, GtkWidget *page, guint page_num, gpointer user_data) {
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehWindow *self = (LumenehWindow *)user_data;
   (void)notebook;
   (void)page_num;
   
@@ -1905,7 +1905,7 @@ static void on_notebook_switch_page(GtkNotebook *notebook, GtkWidget *page, guin
   self->editor = NULL;
   
   for (l = self->tabs; l != NULL; l = l->next) {
-    MarkydTab *t = (MarkydTab *)l->data;
+    LumenehTab *t = (LumenehTab *)l->data;
     if (t->scroll == page) {
       self->current_tab = t;
       self->editor = t->editor;
@@ -1924,17 +1924,17 @@ static void on_notebook_switch_page(GtkNotebook *notebook, GtkWidget *page, guin
 }
 
 static void on_tab_close_clicked(GtkButton *button, gpointer user_data) {
-  MarkydTab *tab = (MarkydTab *)g_object_get_data(G_OBJECT(button), "tab-ref");
-  MarkydWindow *self = (MarkydWindow *)user_data;
+  LumenehTab *tab = (LumenehTab *)g_object_get_data(G_OBJECT(button), "tab-ref");
+  LumenehWindow *self = (LumenehWindow *)user_data;
   if (tab && self) {
-    markyd_window_close_tab(self, tab);
+    lumeneh_window_close_tab(self, tab);
   }
 }
 
-MarkydTab *markyd_window_open_tab(MarkydWindow *self, const gchar *path, const gchar *content) {
+LumenehTab *lumeneh_window_open_tab(LumenehWindow *self, const gchar *path, const gchar *content) {
   if (!self) return NULL;
   
-  MarkydTab *tab = g_new0(MarkydTab, 1);
+  LumenehTab *tab = g_new0(LumenehTab, 1);
   tab->file_path = g_strdup(path);
   
   tab->scroll = gtk_scrolled_window_new(NULL, NULL);
@@ -1942,11 +1942,11 @@ MarkydTab *markyd_window_open_tab(MarkydWindow *self, const gchar *path, const g
   gtk_scrolled_window_set_min_content_width(GTK_SCROLLED_WINDOW(tab->scroll), 100);
   gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(tab->scroll), 100);
   
-  tab->editor = markyd_editor_new(self->app);
-  gtk_container_add(GTK_CONTAINER(tab->scroll), markyd_editor_get_widget(tab->editor));
+  tab->editor = lumeneh_editor_new(self->app);
+  gtk_container_add(GTK_CONTAINER(tab->scroll), lumeneh_editor_get_widget(tab->editor));
   
   if (content) {
-    markyd_editor_set_content(tab->editor, content);
+    lumeneh_editor_set_content(tab->editor, content);
   }
   
   g_signal_connect(tab->editor->buffer, "changed", G_CALLBACK(on_editor_buffer_changed), self);
@@ -1985,7 +1985,7 @@ MarkydTab *markyd_window_open_tab(MarkydWindow *self, const gchar *path, const g
   gtk_widget_show(self->notebook);
   
   // We temporarily set self->editor so ensure_search_tags applies to it
-  MarkydEditor *old_editor = self->editor;
+  LumenehEditor *old_editor = self->editor;
   self->editor = tab->editor;
   ensure_search_tags(self);
   self->editor = old_editor;
@@ -1995,7 +1995,7 @@ MarkydTab *markyd_window_open_tab(MarkydWindow *self, const gchar *path, const g
   return tab;
 }
 
-void markyd_window_close_tab(MarkydWindow *self, MarkydTab *tab) {
+void lumeneh_window_close_tab(LumenehWindow *self, LumenehTab *tab) {
   if (!self || !tab) return;
   
   gint page_num = gtk_notebook_page_num(GTK_NOTEBOOK(self->notebook), tab->scroll);
@@ -2007,10 +2007,10 @@ void markyd_window_close_tab(MarkydWindow *self, MarkydTab *tab) {
   
   if (tab->editor) {
     g_signal_handlers_disconnect_by_func(tab->editor->buffer, on_editor_buffer_changed, self);
-    markyd_editor_free(tab->editor);
-    // Wait, markyd_editor_new allocates a struct. markyd_editor_get_widget returns a widget.
-    // If we don't have a markyd_editor_free, we will leak the struct.
-    // Let's check if there is a markyd_editor_free.
+    lumeneh_editor_free(tab->editor);
+    // Wait, lumeneh_editor_new allocates a struct. lumeneh_editor_get_widget returns a widget.
+    // If we don't have a lumeneh_editor_free, we will leak the struct.
+    // Let's check if there is a lumeneh_editor_free.
   }
   
   g_free(tab->file_path);
@@ -2025,7 +2025,7 @@ void markyd_window_close_tab(MarkydWindow *self, MarkydTab *tab) {
   }
 }
 
-const gchar *markyd_window_get_current_path(MarkydWindow *self) {
+const gchar *lumeneh_window_get_current_path(LumenehWindow *self) {
   if (self && self->current_tab) {
     return self->current_tab->file_path;
   }

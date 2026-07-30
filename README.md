@@ -4,9 +4,7 @@ Native GTK 3 markdown viewer for local **and** remote (SSH) files — with real 
 
 **lumenEh** is a fork of [ViewMD](https://github.com/rabfulton/ViewMD) by rabfulton (MIT). Combined work is **GPL-3.0-or-later**; see [License & provenance](#license--provenance) and [`NOTICE`](NOTICE).
 
-Uses [md4c](https://github.com/mity/md4c) for markdown parsing. Binary/package names may still say `viewmd` until the branding pass.
-
-![ViewMD](assets/screenshot.png)
+Uses [md4c](https://github.com/mity/md4c) for markdown parsing. ![lumenEh](assets/screenshot.png)
 
 ## Features
 
@@ -43,14 +41,14 @@ Code blocks currently support a beta version of keyword highlighting for fenced 
 
 ### Arch Linux (AUR)
 
-https://aur.archlinux.org/packages/viewmd
+https://aur.archlinux.org/packages/lumeneh
 
 ### Debian/Ubuntu (.deb)
 
 Install a built `.deb` package with:
 
 ```bash
-sudo apt install ./viewmd_*.deb
+sudo apt install ./lumeneh_*.deb
 ```
 
 ### Fedora/RHEL (.rpm)
@@ -58,12 +56,12 @@ sudo apt install ./viewmd_*.deb
 Install a built `.rpm` package with:
 
 ```bash
-sudo dnf install ./viewmd-*.rpm
+sudo dnf install ./lumeneh-*.rpm
 ```
 
 ## Usage
 
-Run `viewmd` to start the application.
+Run `lumeneh` to start the application.
 
 - **Open button**: Open a markdown document
 - **Reload button**: Reload the currently open document from disk
@@ -71,7 +69,7 @@ Run `viewmd` to start the application.
 
 ### Remote SSH File Manager
 
-ViewMD can natively browse and open Markdown files hosted on remote servers over SSH.
+lumenEh can natively browse and open Markdown files hosted on remote servers over SSH.
 
 - Click the **Open Remote (SSH)** button in the header bar.
 - Enter an SSH URI (e.g., `ssh://user@hostname/path/to/docs` or `user@hostname:/path/to/docs`).
@@ -91,11 +89,11 @@ ViewMD can natively browse and open Markdown files hosted on remote servers over
 
 ### Set as Default `.md` Viewer
 
-After installing, associate markdown MIME types with `viewmd.desktop`:
+After installing, associate markdown MIME types with `lumeneh.desktop`:
 
 ```bash
-xdg-mime default viewmd.desktop text/markdown
-xdg-mime default viewmd.desktop text/x-markdown
+xdg-mime default lumeneh.desktop text/markdown
+xdg-mime default lumeneh.desktop text/x-markdown
 ```
 
 Verify the current default:
@@ -120,8 +118,8 @@ sudo make install
 ```
 
 This installs:
-- Binary to `/usr/local/bin/viewmd`
-- Desktop file to `/usr/local/share/applications/viewmd.desktop`
+- Binary to `/usr/local/bin/lumeneh`
+- Desktop file to `/usr/local/share/applications/lumeneh.desktop`
 
 ### Uninstallation
 
@@ -149,11 +147,11 @@ sudo dnf install gtk3-devel
 
 - Arch: `packaging/arch/PKGBUILD`
 - Debian: `packaging/deb/control.in`
-- RPM: `packaging/rpm/viewmd.spec.in`
+- RPM: `packaging/rpm/lumeneh.spec.in`
 
 ## Other Useful Projects
 - TrayMD is an app for taking notes in markdown with live editing [TrayMD](https://github.com/rabfulton/TrayMD)
-- Preditor is an image viewer with a similar philosophy to viewmd [preditor](https://github.com/rabfulton/preditor)
+- Preditor is an image viewer with a similar philosophy to lumeneh [preditor](https://github.com/rabfulton/preditor)
 - Try my AI panel plugin for XFCE [XFCE Ask](https://github.com/rabfulton/xfce-ask)
 - For a feature complete AI application try out [ChatGTK](https://github.com/rabfulton/ChatGTK)
 - A lightweight speech to text implementation [Auriscribe](https://github.com/rabfulton/Auriscribe)
@@ -165,6 +163,5 @@ sudo dnf install gtk3-devel
 
 - Combined work: **GPL-3.0-or-later** (see [`LICENSE`](LICENSE))
 - Upstream ViewMD and vendored **md4c** retain their MIT terms as documented in [`NOTICE`](NOTICE)
-- Packaging license fields: GPL-3.0-or-later (package *names* may still say `viewmd` until the branding pass)
-
-Binary and package names may still say `viewmd` until the branding pass.
+- Packaging license fields: **GPL-3.0-or-later**
+- Binary / packages: `lumeneh`; product name: **lumenEh**

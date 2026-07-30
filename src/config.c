@@ -5,12 +5,12 @@
 #include <string.h>
 
 /* Global config instance */
-MarkydConfig *config = NULL;
+LumenehConfig *config = NULL;
 
 static gchar *config_path = NULL;
 
-MarkydConfig *config_new(void) {
-  MarkydConfig *cfg = g_new0(MarkydConfig, 1);
+LumenehConfig *config_new(void) {
+  LumenehConfig *cfg = g_new0(LumenehConfig, 1);
 
   /* Default values */
   cfg->window_x = -1;
@@ -35,7 +35,7 @@ MarkydConfig *config_new(void) {
   return cfg;
 }
 
-void config_free(MarkydConfig *cfg) {
+void config_free(LumenehConfig *cfg) {
   if (!cfg)
     return;
   g_free(cfg->font_family);
@@ -50,7 +50,7 @@ void config_free(MarkydConfig *cfg) {
 const gchar *config_get_path(void) {
   if (!config_path) {
     const gchar *config_dir = g_get_user_config_dir();
-    gchar *new_app_dir = g_build_filename(config_dir, "viewmd", NULL);
+    gchar *new_app_dir = g_build_filename(config_dir, "lumeneh", NULL);
 
     g_mkdir_with_parents(new_app_dir, 0755);
     config_path = g_build_filename(new_app_dir, "config.ini", NULL);
@@ -60,7 +60,7 @@ const gchar *config_get_path(void) {
   return config_path;
 }
 
-gboolean config_load(MarkydConfig *cfg) {
+gboolean config_load(LumenehConfig *cfg) {
   GKeyFile *keyfile;
   GError *error = NULL;
   const gchar *path;
@@ -135,7 +135,7 @@ gboolean config_load(MarkydConfig *cfg) {
   return TRUE;
 }
 
-gboolean config_save(MarkydConfig *cfg) {
+gboolean config_save(LumenehConfig *cfg) {
   GKeyFile *keyfile;
   GError *error = NULL;
   const gchar *path;

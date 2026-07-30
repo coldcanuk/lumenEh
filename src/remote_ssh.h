@@ -1,5 +1,5 @@
-#ifndef VIEWMD_REMOTE_SSH_H
-#define VIEWMD_REMOTE_SSH_H
+#ifndef LUMENEH_REMOTE_SSH_H
+#define LUMENEH_REMOTE_SSH_H
 
 #include <glib.h>
 
@@ -37,4 +37,4 @@ gboolean remote_ssh_list_dir(const RemoteSSHLocation *loc,
                              GPtrArray **out_items,
                              GError **error);
 
-#endif /* VIEWMD_REMOTE_SSH_H */
+#endif /* LUMENEH_REMOTE_SSH_H */
