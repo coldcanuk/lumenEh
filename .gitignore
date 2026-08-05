@@ -1,4 +1,4 @@
-# Build outputs (binary rename lands later with branding)
+# Build outputs
 /lumeneh
 /obj/
 *.o
@@ -7,18 +7,43 @@
 # configure-generated machine-local paths (never commit)
 /config.mk
 
-# Ephemeral local work
+# Ephemeral local work / package staging
 /scratch/
 /.package-build/
 *.pyc
 .env
 .env.*
 
+# Secrets and crypto material that must never land in git.
+# Public APT keyrings live under packaging/apt/ and are allowed by name below.
+*.pem
+*.key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.p12
+*.pfx
+secring.*
+*private*.asc
+*secret*.asc
+*secret*.gpg
+*private*.gpg
+*.rev
+/gpg-backup/
+.gnupg/
+**/.gnupg/
+
+# Explicitly allow the published public keyring only (not private material).
+# If a path matches both an ignore and a later un-ignore, the last match wins.
+!packaging/apt/lumeneh-archive-keyring.asc
+!packaging/apt/lumeneh-archive-keyring.gpg
+
 # Local throwaway tests / experiments (not wired into Makefile)
 /test_scroll
 /test_scroll.c
 /test_bookmarks.c
-/fix_window.py
+/test_window.py
 /patch.c
 /patch_window.py
 /plan.md
