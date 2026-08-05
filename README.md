@@ -45,6 +45,37 @@ Current release version: **0.2.0** (see [`VERSION`](VERSION)). Choose one of the
 
 Pre-built packages for each release are in [`releases/`](releases/) and on [GitHub Releases](https://github.com/coldcanuk/lumenEh/releases).
 
+### Install with `apt install lumeneh` (APT repository)
+
+`apt install lumeneh` (without a local path) needs a published APT repository,
+not only a `.deb` file. This project includes tooling to **build and sign** that
+repo; you still need to **host** it over HTTPS once.
+
+**Maintainer — build the repo tree:**
+
+```bash
+make packages          # releases/lumeneh_*.deb
+make apt-repo          # apt-repo/ pool + Packages + Release
+scripts/sign-apt-repo.sh   # if signing needs your GPG passphrase
+```
+
+Public signing key (for `Signed-By`): [`packaging/apt/lumeneh-archive-keyring.gpg`](packaging/apt/lumeneh-archive-keyring.gpg).
+
+**End user — after the repo is published at `<BASE>`** (example):
+
+```bash
+curl -fsSL <BASE>/keyring/lumeneh-archive-keyring.gpg \
+  | sudo tee /usr/share/keyrings/lumeneh-archive-keyring.gpg >/dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/lumeneh-archive-keyring.gpg] <BASE> stable main" \
+  | sudo tee /etc/apt/sources.list.d/lumeneh.list
+
+sudo apt update
+sudo apt install lumeneh
+```
+
+Until `<BASE>` is online, use a local `.deb` install below.
+
 ### Install from a `.deb` package (Debian / Ubuntu / Pop!_OS)
 
 **Option A — from a git clone** (packages already under `releases/`):
