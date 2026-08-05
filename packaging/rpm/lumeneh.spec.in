@@ -30,6 +30,7 @@ make install DESTDIR=%{buildroot} PREFIX=%{_prefix}
 %files
 %{_bindir}/lumeneh
 %{_datadir}/applications/lumeneh.desktop
+%{_datadir}/icons/hicolor/256x256/apps/lumeneh.png
 
 %changelog
 * Thu Jan 01 1970 lumenEh Packager <noreply@example.com> - @VERSION@-1

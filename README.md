@@ -121,13 +121,32 @@ sudo make install
 
 This installs:
 - Binary to `/usr/local/bin/lumeneh`
-- Desktop file to `/usr/local/share/applications/lumeneh.desktop`
+- Desktop entry to `/usr/local/share/applications/lumeneh.desktop` (application launcher)
+- App icon to `/usr/local/share/icons/hicolor/256x256/apps/lumeneh.png`
+
+On an interactive terminal, `make install` asks whether to also place a shortcut on your personal Desktop (`~/Desktop` or `XDG_DESKTOP_DIR`). Packaging and staged installs (`DESTDIR=...`) never create a personal Desktop shortcut.
+
+Opt in non-interactively:
+
+```bash
+sudo make install DESKTOP_SHORTCUT=1
+```
+
+Opt out explicitly (no prompt):
+
+```bash
+sudo make install DESKTOP_SHORTCUT=0
+```
+
+Application icon art lives at `assets/icons/lumeneh.png`. To replace the placeholder with final art, follow [`assets/icons/GROK_IMAGINE_ICON.md`](assets/icons/GROK_IMAGINE_ICON.md).
 
 ### Uninstallation
 
 ```bash
 sudo make uninstall
 ```
+
+Uninstall removes the binary, applications desktop entry, installed icon, and (when run without `DESTDIR`) any personal Desktop shortcut previously installed for the current user.
 ### Dependencies
 
 ### Arch Linux

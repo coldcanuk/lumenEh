@@ -30,6 +30,7 @@ done
 BINDIR=${BINDIR:-$PREFIX/bin}
 DATADIR=${DATADIR:-$PREFIX/share}
 APPSDIR="$DATADIR/applications"
+ICONSDIR="$DATADIR/icons/hicolor/256x256/apps"
 
 echo "Checking system environment..."
 
@@ -84,6 +85,7 @@ PREFIX = $PREFIX
 bindir = $BINDIR
 datadir = $DATADIR
 applicationsdir = $APPSDIR
+iconsdir = $ICONSDIR
 EOF
 
 echo "Configuration complete!"
@@ -93,3 +95,6 @@ echo "  make"
 echo ""
 echo "To install the application, run:"
 echo "  sudo make install"
+echo ""
+echo "Optional personal Desktop shortcut (opt-in, never used with DESTDIR):"
+echo "  sudo make install DESKTOP_SHORTCUT=1"
