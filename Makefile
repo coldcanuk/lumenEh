@@ -21,6 +21,8 @@ iconsdir ?= $(datadir)/icons/hicolor/256x256/apps
 ICON_SRC = assets/icons/lumeneh.png
 ICON_NAME = lumeneh.png
 DESKTOP_SRC = assets/lumeneh.desktop
+# Shared SUDO_USER-aware Desktop path resolution (install + uninstall).
+DESKTOP_HELPER = scripts/resolve_desktop.sh
 
 .PHONY: all clean install uninstall maybe-desktop-shortcut do-desktop-shortcut test-install
 
@@ -78,40 +80,20 @@ maybe-desktop-shortcut:
 		echo "Note: pass DESKTOP_SHORTCUT=1 to also install a personal Desktop shortcut."; \
 	fi
 
-# Resolve XDG Desktop dir for the installing user and place lumeneh.desktop there.
+# Place lumeneh.desktop on the invoking user's Desktop (SUDO_USER under sudo).
 do-desktop-shortcut:
 	@if [ -n "$(DESTDIR)" ]; then \
 		echo "error: do-desktop-shortcut refuses DESTDIR installs" >&2; \
 		exit 1; \
-	fi; \
-	desk=""; \
-	if [ -n "$$HOME" ] && [ -f "$$HOME/.config/user-dirs.dirs" ]; then \
-		desk=$$(sed -n 's/^XDG_DESKTOP_DIR="\(.*\)"/\1/p' "$$HOME/.config/user-dirs.dirs" | head -n1); \
-		desk=$$(eval echo "$$desk"); \
-	fi; \
-	if [ -z "$$desk" ] && [ -n "$$HOME" ]; then \
-		desk="$$HOME/Desktop"; \
-	fi; \
-	if [ -z "$$desk" ]; then \
-		echo "warning: cannot resolve Desktop directory; skipping personal shortcut" >&2; \
-		exit 0; \
-	fi; \
-	mkdir -p "$$desk"; \
-	install -Dm644 $(DESKTOP_SRC) "$$desk/lumeneh.desktop"; \
-	echo "Installed personal Desktop shortcut: $$desk/lumeneh.desktop"
+	fi
+	@bash $(DESKTOP_HELPER) install-shortcut $(DESKTOP_SRC)
 
 uninstall:
 	rm -f $(DESTDIR)$(bindir)/lumeneh
 	rm -f $(DESTDIR)$(applicationsdir)/lumeneh.desktop
 	rm -f $(DESTDIR)$(iconsdir)/$(ICON_NAME)
-	@if [ -z "$(DESTDIR)" ] && [ -n "$$HOME" ]; then \
-		desk=""; \
-		if [ -f "$$HOME/.config/user-dirs.dirs" ]; then \
-			desk=$$(sed -n 's/^XDG_DESKTOP_DIR="\(.*\)"/\1/p' "$$HOME/.config/user-dirs.dirs" | head -n1); \
-			desk=$$(eval echo "$$desk"); \
-		fi; \
-		if [ -z "$$desk" ]; then desk="$$HOME/Desktop"; fi; \
-		rm -f "$$desk/lumeneh.desktop"; \
+	@if [ -z "$(DESTDIR)" ]; then \
+		bash $(DESKTOP_HELPER) remove-shortcut; \
 	fi
 
 # Committed install-path smoke test (drives real make install/uninstall).

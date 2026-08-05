@@ -105,8 +105,7 @@ HOME="$FAKEHOME" make install DESTDIR="$DEST" PREFIX="$PREFIX" \
   iconsdir="$PREFIX/share/icons/hicolor/256x256/apps" >/dev/null
 [[ ! -e "$PERSONAL" ]] || fail "unexpected personal shortcut after DESTDIR reinstall"
 
-# Opt-in without DESTDIR: only run the desktop-shortcut target path via DESKTOP_SHORTCUT
-# against a throwaway "system" install is not required; do-desktop-shortcut uses HOME only.
+# Opt-in without DESTDIR: real do-desktop-shortcut target (non-sudo HOME).
 rm -f "$PERSONAL"
 HOME="$FAKEHOME" make do-desktop-shortcut DESKTOP_SHORTCUT=1 DESTDIR=
 [[ -f "$PERSONAL" ]] || fail "DESKTOP_SHORTCUT opt-in did not create $PERSONAL"
@@ -128,6 +127,80 @@ HOME="$FAKEHOME" make install DESTDIR="$DEST" PREFIX="$PREFIX" \
 
 pass "DESTDIR install never places personal Desktop shortcut (even if DESKTOP_SHORTCUT=1)"
 
+# --- 3c) sudo path: HOME=/root + SUDO_USER → invoking user's Desktop, not root's ---
+HELPER="$ROOT/scripts/resolve_desktop.sh"
+[[ -x "$HELPER" || -f "$HELPER" ]] || fail "missing $HELPER"
+chmod +x "$HELPER"
+
+# Non-root: SUDO_USER alone must not redirect (no elevated install).
+got_home="$(HOME=/root SUDO_USER=chuck bash "$HELPER" target-home)"
+[[ "$got_home" == "/root" ]] || fail "non-root should use HOME=/root, got $got_home"
+
+# EUID 0 (user namespace): SUDO_USER home via getent.
+if command -v unshare >/dev/null 2>&1 && unshare -r true 2>/dev/null; then
+  got_home="$(HOME=/root SUDO_USER=chuck unshare -r bash "$HELPER" target-home)"
+  chuck_home="$(getent passwd chuck | cut -d: -f6)"
+  [[ -n "$chuck_home" ]] || fail "getent passwd chuck failed"
+  [[ "$got_home" == "$chuck_home" ]] || fail "root+SUDO_USER=chuck should resolve $chuck_home, got $got_home"
+  pass "resolve_desktop target-home uses getent under EUID 0 + SUDO_USER"
+
+  # Full make install/uninstall path with shadowed getent → fake user home (no real Desktop pollution).
+  SUDO_HOME="$SCRATCH/sudo_user_home"
+  ROOT_HOME="$SCRATCH/root_home"
+  mkdir -p "$SUDO_HOME/Desktop" "$ROOT_HOME/Desktop" "$SCRATCH/bin"
+  cat >"$SCRATCH/bin/getent" <<'GETENT'
+#!/usr/bin/env bash
+# Shadow getent for install tests: map SUDO_USER=testuser to FAKE_SUDO_HOME.
+if [[ "${1:-}" == passwd && "${2:-}" == testuser ]]; then
+  printf 'testuser:x:1001:1001::%s:/bin/bash\n' "${FAKE_SUDO_HOME:?}"
+  exit 0
+fi
+exec /usr/bin/getent "$@"
+GETENT
+  chmod +x "$SCRATCH/bin/getent"
+
+  rm -f "$SUDO_HOME/Desktop/lumeneh.desktop" "$ROOT_HOME/Desktop/lumeneh.desktop"
+  # Drive the real make target under fake root with HOME=/root and SUDO_USER=testuser.
+  FAKE_SUDO_HOME="$SUDO_HOME" PATH="$SCRATCH/bin:$PATH" HOME="$ROOT_HOME" SUDO_USER=testuser \
+    unshare -r make -C "$ROOT" do-desktop-shortcut DESTDIR= \
+    >"$SCRATCH/sudo-desktop-install.log" 2>&1 || {
+      cat "$SCRATCH/sudo-desktop-install.log" >&2
+      fail "make do-desktop-shortcut under unshare -r failed"
+    }
+
+  [[ -f "$SUDO_HOME/Desktop/lumeneh.desktop" ]] \
+    || fail "sudo-style install did not create $SUDO_HOME/Desktop/lumeneh.desktop"
+  [[ ! -e "$ROOT_HOME/Desktop/lumeneh.desktop" ]] \
+    || fail "sudo-style install incorrectly wrote root Desktop shortcut"
+  grep -q '^Icon=lumeneh$' "$SUDO_HOME/Desktop/lumeneh.desktop" \
+    || fail "sudo-style personal shortcut missing Icon=lumeneh"
+
+  pass "HOME=/root SUDO_USER=testuser install lands on invoking-user Desktop"
+
+  # Uninstall via real make target: point system paths at empty scratch so we only
+  # exercise personal-shortcut removal (same SUDO_USER resolution as install).
+  FAKE_SUDO_HOME="$SUDO_HOME" PATH="$SCRATCH/bin:$PATH" HOME="$ROOT_HOME" SUDO_USER=testuser \
+    unshare -r make -C "$ROOT" uninstall DESTDIR= \
+    bindir="$SCRATCH/empty-prefix/bin" \
+    applicationsdir="$SCRATCH/empty-prefix/share/applications" \
+    iconsdir="$SCRATCH/empty-prefix/share/icons/hicolor/256x256/apps" \
+    >"$SCRATCH/sudo-desktop-uninstall.log" 2>&1 || {
+      cat "$SCRATCH/sudo-desktop-uninstall.log" >&2
+      fail "make uninstall under unshare -r failed"
+    }
+  [[ ! -e "$SUDO_HOME/Desktop/lumeneh.desktop" ]] \
+    || fail "sudo-style uninstall left $SUDO_HOME/Desktop/lumeneh.desktop"
+  [[ ! -e "$ROOT_HOME/Desktop/lumeneh.desktop" ]] \
+    || fail "unexpected root Desktop shortcut after uninstall"
+
+  pass "sudo-style uninstall removes SUDO_USER Desktop shortcut"
+else
+  echo "SKIP: unshare -r unavailable; SUDO_USER euid0 install path not exercised end-to-end" >&2
+  # Still assert helper encodes the root+SUDO_USER getent branch (static structure).
+  grep -q 'SUDO_USER' "$HELPER" || fail "helper missing SUDO_USER handling"
+  grep -q 'getent passwd' "$HELPER" || fail "helper missing getent passwd"
+fi
+
 # --- 4) Grok Imagine instructions and icon source path ---
 IMAGINE="$ROOT/assets/icons/GROK_IMAGINE_ICON.md"
 ICON_SRC="$ROOT/assets/icons/lumeneh.png"
@@ -137,6 +210,7 @@ grep -q 'assets/icons/lumeneh.png' "$IMAGINE" || fail "Imagine instructions must
 grep -qi 'icon\|markdown\|256' "$IMAGINE" || fail "Imagine instructions lack subject/size guidance"
 # Makefile must install from that source path
 grep -q 'assets/icons/lumeneh.png' "$ROOT/Makefile" || fail "Makefile does not reference assets/icons/lumeneh.png"
+grep -q 'resolve_desktop.sh' "$ROOT/Makefile" || fail "Makefile must call resolve_desktop.sh for Desktop shortcut"
 
 pass "Grok Imagine instructions and icon source path match install"
 

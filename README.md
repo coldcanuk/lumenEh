@@ -126,6 +126,8 @@ This installs:
 
 On an interactive terminal, `make install` asks whether to also place a shortcut on your personal Desktop (`~/Desktop` or `XDG_DESKTOP_DIR`). Packaging and staged installs (`DESTDIR=...`) never create a personal Desktop shortcut.
 
+When install runs under `sudo`, the personal shortcut (if opted in) is placed on the **invoking user's** Desktop (`SUDO_USER` via `getent`), not root's. Uninstall uses the same resolution so `sudo make uninstall` removes that same file.
+
 Opt in non-interactively:
 
 ```bash
@@ -146,7 +148,7 @@ Application icon art lives at `assets/icons/lumeneh.png`. To replace the placeho
 sudo make uninstall
 ```
 
-Uninstall removes the binary, applications desktop entry, installed icon, and (when run without `DESTDIR`) any personal Desktop shortcut previously installed for the current user.
+Uninstall removes the binary, applications desktop entry, installed icon, and (when run without `DESTDIR`) any personal Desktop shortcut for the installing user — under `sudo`, that is the `SUDO_USER` Desktop, not `/root/Desktop`.
 ### Dependencies
 
 ### Arch Linux
