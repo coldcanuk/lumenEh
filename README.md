@@ -41,33 +41,118 @@ Code blocks currently support a beta version of keyword highlighting for fenced 
 
 ## Installation
 
-Current release version: **0.2.0** (see [`VERSION`](VERSION)). Pre-built packages for each release are in [`releases/`](releases/) and on [GitHub Releases](https://github.com/coldcanuk/lumenEh/releases).
+Current release version: **0.2.0** (see [`VERSION`](VERSION)). Choose one of the methods below.
 
-### Arch Linux (AUR)
+Pre-built packages for each release are in [`releases/`](releases/) and on [GitHub Releases](https://github.com/coldcanuk/lumenEh/releases).
 
-https://aur.archlinux.org/packages/lumeneh
+### Install from a `.deb` package (Debian / Ubuntu / Pop!_OS)
 
-### Debian/Ubuntu (.deb)
-
-From a clone of this repository:
+**Option A — from a git clone** (packages already under `releases/`):
 
 ```bash
 sudo apt install ./releases/lumeneh_0.2.0_amd64.deb
 ```
 
-Or download the `.deb` asset from the [latest GitHub Release](https://github.com/coldcanuk/lumenEh/releases/latest) and install the same way.
+**Option B — download from GitHub Releases:**
 
-### Fedora/RHEL (.rpm)
+```bash
+# Download the .deb from:
+#   https://github.com/coldcanuk/lumenEh/releases/latest
+sudo apt install ./lumeneh_0.2.0_amd64.deb
+```
 
-From a clone of this repository:
+You can also use `dpkg` directly:
+
+```bash
+sudo dpkg -i ./releases/lumeneh_0.2.0_amd64.deb
+sudo apt-get install -f   # only if dpkg reports missing dependencies
+```
+
+### Install from an `.rpm` package (Fedora / RHEL / openSUSE)
+
+**Option A — from a git clone:**
 
 ```bash
 sudo dnf install ./releases/lumeneh-0.2.0-1.*.rpm
 ```
 
-Or download the `.rpm` asset from the [latest GitHub Release](https://github.com/coldcanuk/lumenEh/releases/latest).
+**Option B — download from GitHub Releases:**
 
-### Build packages from source
+```bash
+# Download the .rpm from:
+#   https://github.com/coldcanuk/lumenEh/releases/latest
+sudo dnf install ./lumeneh-0.2.0-1.*.rpm
+```
+
+On systems without `dnf`, use:
+
+```bash
+sudo rpm -Uvh ./releases/lumeneh-0.2.0-1.*.rpm
+```
+
+### Arch Linux (AUR)
+
+https://aur.archlinux.org/packages/lumeneh
+
+### Compile and install from source
+
+Build dependencies:
+
+| Distro | Install build dependencies |
+|--------|----------------------------|
+| Arch Linux | `sudo pacman -S gtk3` |
+| Ubuntu / Debian | `sudo apt install build-essential pkg-config libgtk-3-dev` |
+| Fedora / RHEL | `sudo dnf install gcc make pkgconf-pkg-config gtk3-devel` |
+
+Clone, compile, and install:
+
+```bash
+git clone https://github.com/coldcanuk/lumenEh.git
+cd lumenEh
+./configure
+make
+sudo make install
+```
+
+By default this installs to `/usr/local`:
+
+| Path | What |
+|------|------|
+| `/usr/local/bin/lumeneh` | Application binary |
+| `/usr/local/share/applications/lumeneh.desktop` | Application launcher entry |
+| `/usr/local/share/icons/hicolor/256x256/apps/lumeneh.png` | App icon |
+
+Custom prefix (example: system-wide under `/usr`):
+
+```bash
+./configure --prefix=/usr
+make
+sudo make install
+```
+
+On an interactive terminal, `make install` asks whether to also place a shortcut on your personal Desktop. Packaging and staged installs (`DESTDIR=...`) never create a personal Desktop shortcut.
+
+When install runs under `sudo`, an opted-in Desktop shortcut goes to the **invoking user's** Desktop (`SUDO_USER`), not root's.
+
+```bash
+# Opt in without a prompt
+sudo make install DESKTOP_SHORTCUT=1
+
+# Opt out without a prompt
+sudo make install DESKTOP_SHORTCUT=0
+```
+
+Uninstall a source install:
+
+```bash
+sudo make uninstall
+```
+
+Uninstall removes the binary, desktop entry, icon, and (without `DESTDIR`) any personal Desktop shortcut for the installing user.
+
+### Build your own `.deb` / `.rpm` packages
+
+If you want to produce packages yourself (instead of using the ones in `releases/`):
 
 ```bash
 ./configure --prefix=/usr
@@ -75,7 +160,7 @@ make
 make packages
 ```
 
-This writes `releases/lumeneh_<version>_<arch>.deb` and `releases/lumeneh-<version>-*.rpm`. Requires `dpkg-deb` and `rpmbuild`.
+This writes versioned files under `releases/` (for example `lumeneh_0.2.0_amd64.deb` and `lumeneh-0.2.0-1.x86_64.rpm`). Requires `dpkg-deb` and `rpmbuild`.
 
 ## Usage
 
@@ -127,60 +212,7 @@ xdg-open README.md
 ```
 
 
-## Building From Source
-
-```bash
-./configure
-make
-sudo make install
-```
-
-This installs:
-- Binary to `/usr/local/bin/lumeneh`
-- Desktop entry to `/usr/local/share/applications/lumeneh.desktop` (application launcher)
-- App icon to `/usr/local/share/icons/hicolor/256x256/apps/lumeneh.png`
-
-On an interactive terminal, `make install` asks whether to also place a shortcut on your personal Desktop (`~/Desktop` or `XDG_DESKTOP_DIR`). Packaging and staged installs (`DESTDIR=...`) never create a personal Desktop shortcut.
-
-When install runs under `sudo`, the personal shortcut (if opted in) is placed on the **invoking user's** Desktop (`SUDO_USER` via `getent`), not root's. Uninstall uses the same resolution so `sudo make uninstall` removes that same file.
-
-Opt in non-interactively:
-
-```bash
-sudo make install DESKTOP_SHORTCUT=1
-```
-
-Opt out explicitly (no prompt):
-
-```bash
-sudo make install DESKTOP_SHORTCUT=0
-```
-
-Application icon art lives at `assets/icons/lumeneh.png`. To replace the placeholder with final art, follow [`assets/icons/GROK_IMAGINE_ICON.md`](assets/icons/GROK_IMAGINE_ICON.md).
-
-### Uninstallation
-
-```bash
-sudo make uninstall
-```
-
-Uninstall removes the binary, applications desktop entry, installed icon, and (when run without `DESTDIR`) any personal Desktop shortcut for the installing user — under `sudo`, that is the `SUDO_USER` Desktop, not `/root/Desktop`.
-### Dependencies
-
-### Arch Linux
-```bash
-sudo pacman -S gtk3
-```
-
-### Ubuntu/Debian
-```bash
-sudo apt install libgtk-3-dev
-```
-
-### Fedora
-```bash
-sudo dnf install gtk3-devel
-```
+Application icon art lives at `assets/icons/lumeneh.png`. To generate or replace it, see [`assets/icons/GROK_IMAGINE_ICON.md`](assets/icons/GROK_IMAGINE_ICON.md).
 
 ## Packaging Templates
 
