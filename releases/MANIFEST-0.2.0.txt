@@ -1,0 +1,5 @@
+version=0.2.0
+deb=lumeneh_0.2.0_amd64.deb
+rpm=lumeneh-0.2.0-1.x86_64.rpm
+built=2026-08-05T23:14:37Z
+commit=d78c86b

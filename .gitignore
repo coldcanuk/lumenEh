@@ -9,6 +9,7 @@
 
 # Ephemeral local work
 /scratch/
+/.package-build/
 *.pyc
 .env
 .env.*

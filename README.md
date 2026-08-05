@@ -41,25 +41,41 @@ Code blocks currently support a beta version of keyword highlighting for fenced 
 
 ## Installation
 
+Current release version: **0.2.0** (see [`VERSION`](VERSION)). Pre-built packages for each release are in [`releases/`](releases/) and on [GitHub Releases](https://github.com/coldcanuk/lumenEh/releases).
+
 ### Arch Linux (AUR)
 
 https://aur.archlinux.org/packages/lumeneh
 
 ### Debian/Ubuntu (.deb)
 
-Install a built `.deb` package with:
+From a clone of this repository:
 
 ```bash
-sudo apt install ./lumeneh_*.deb
+sudo apt install ./releases/lumeneh_0.2.0_amd64.deb
 ```
+
+Or download the `.deb` asset from the [latest GitHub Release](https://github.com/coldcanuk/lumenEh/releases/latest) and install the same way.
 
 ### Fedora/RHEL (.rpm)
 
-Install a built `.rpm` package with:
+From a clone of this repository:
 
 ```bash
-sudo dnf install ./lumeneh-*.rpm
+sudo dnf install ./releases/lumeneh-0.2.0-1.*.rpm
 ```
+
+Or download the `.rpm` asset from the [latest GitHub Release](https://github.com/coldcanuk/lumenEh/releases/latest).
+
+### Build packages from source
+
+```bash
+./configure --prefix=/usr
+make
+make packages
+```
+
+This writes `releases/lumeneh_<version>_<arch>.deb` and `releases/lumeneh-<version>-*.rpm`. Requires `dpkg-deb` and `rpmbuild`.
 
 ## Usage
 
@@ -171,6 +187,10 @@ sudo dnf install gtk3-devel
 - Arch: `packaging/arch/PKGBUILD`
 - Debian: `packaging/deb/control.in`
 - RPM: `packaging/rpm/lumeneh.spec.in`
+- Built packages: `releases/` (see [`releases/README.md`](releases/README.md))
+- Package build script: `scripts/build-packages.sh` (`make packages`)
+
+Release tags use the form `vX.Y.Z` matching [`VERSION`](VERSION) (for example `v0.2.0`). Publishing a GitHub Release runs [`.github/workflows/package.yml`](.github/workflows/package.yml) to attach `.deb` / `.rpm` assets.
 
 ## Other Useful Projects
 - TrayMD is an app for taking notes in markdown with live editing [TrayMD](https://github.com/rabfulton/TrayMD)

@@ -24,7 +24,7 @@ DESKTOP_SRC = assets/lumeneh.desktop
 # Shared SUDO_USER-aware Desktop path resolution (install + uninstall).
 DESKTOP_HELPER = scripts/resolve_desktop.sh
 
-.PHONY: all clean install uninstall maybe-desktop-shortcut do-desktop-shortcut test-install
+.PHONY: all clean install uninstall maybe-desktop-shortcut do-desktop-shortcut test-install packages
 
 all: $(TARGET)
 
@@ -99,6 +99,10 @@ uninstall:
 # Committed install-path smoke test (drives real make install/uninstall).
 test-install:
 	bash tests/test_install.sh
+
+# Build versioned .deb and .rpm into releases/ (see VERSION).
+packages:
+	bash scripts/build-packages.sh
 
 # Header dependencies
 $(OBJDIR)/main.o: $(SRCDIR)/app.h $(SRCDIR)/window.h
