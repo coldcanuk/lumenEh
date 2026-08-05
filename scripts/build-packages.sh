@@ -87,47 +87,75 @@ dpkg-deb --build --root-owner-group "${DEB_ROOT}" "${RELEASES}/${DEB_NAME}.deb"
 echo "    wrote ${RELEASES}/${DEB_NAME}.deb"
 
 # ---------------------------------------------------------------------------
-# .rpm (binary package from the same staged tree as the .deb)
+# .rpm (optional unless REQUIRE_RPM=1)
 # ---------------------------------------------------------------------------
-if ! command -v rpmbuild >/dev/null 2>&1; then
-  echo "error: rpmbuild not found; install rpm-build or put rpmbuild on PATH" >&2
-  exit 1
-fi
-
-# User-local / non-system rpm installs need RPM_CONFIGDIR pointing at lib/rpm.
-if [[ -z "${RPM_CONFIGDIR:-}" ]]; then
-  if [[ ! -f /usr/lib/rpm/rpmrc ]]; then
-    for candidate in \
-      "${RPMTOOLS:-}/usr/lib/rpm" \
-      "$(dirname "$(command -v rpmbuild)")/../lib/rpm"; do
-      if [[ -f "${candidate}/rpmrc" ]]; then
-        export RPM_CONFIGDIR="$(cd "${candidate}" && pwd)"
-        break
-      fi
-    done
+# Locate rpmbuild: PATH first, then optional user-local RPMTOOLS tree.
+RPMBUILD_BIN=""
+if command -v rpmbuild >/dev/null 2>&1; then
+  RPMBUILD_BIN="$(command -v rpmbuild)"
+elif [[ -n "${RPMTOOLS:-}" && -x "${RPMTOOLS}/usr/bin/rpmbuild" ]]; then
+  RPMBUILD_BIN="${RPMTOOLS}/usr/bin/rpmbuild"
+  export PATH="${RPMTOOLS}/usr/bin:${PATH}"
+  if [[ -d "${RPMTOOLS}/usr/lib/x86_64-linux-gnu" ]]; then
+    export LD_LIBRARY_PATH="${RPMTOOLS}/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
   fi
 fi
-if [[ ! -f /usr/lib/rpm/rpmrc ]] && [[ -z "${RPM_CONFIGDIR:-}" ]]; then
-  echo "error: cannot find rpmrc (set RPM_CONFIGDIR to .../usr/lib/rpm)" >&2
-  exit 1
-fi
 
-RPM_TOP="${WORKDIR}/rpmbuild"
-RPM_STAGE="${WORKDIR}/rpm-root"
-rm -rf "${RPM_TOP}" "${RPM_STAGE}"
-mkdir -p "${RPM_TOP}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} "${RPM_STAGE}"
+RPM_BASENAME=""
+if [[ -z "${RPMBUILD_BIN}" ]]; then
+  msg="rpmbuild not found on PATH"
+  if [[ "${REQUIRE_RPM:-0}" == "1" ]]; then
+    echo "error: ${msg}; install rpm-build or set RPMTOOLS=… (REQUIRE_RPM=1)" >&2
+    exit 1
+  fi
+  echo "warning: ${msg} — skipping .rpm (deb is ready)." >&2
+  echo "         Install: sudo apt install rpm  # provides rpmbuild on Debian/Ubuntu" >&2
+  echo "         Or: REQUIRE_RPM=1 to hard-fail; RPMTOOLS=/path/to/prefix for a local tree" >&2
+  RPM_BASENAME="(skipped)"
+else
+  # User-local / non-system rpm installs need RPM_CONFIGDIR pointing at lib/rpm.
+  if [[ -z "${RPM_CONFIGDIR:-}" ]]; then
+    if [[ ! -f /usr/lib/rpm/rpmrc ]]; then
+      for candidate in \
+        "${RPMTOOLS:-}/usr/lib/rpm" \
+        "$(dirname "${RPMBUILD_BIN}")/../lib/rpm"; do
+        if [[ -f "${candidate}/rpmrc" ]]; then
+          export RPM_CONFIGDIR="$(cd "${candidate}" && pwd)"
+          break
+        fi
+      done
+    fi
+  fi
+  if [[ ! -f /usr/lib/rpm/rpmrc ]] && [[ -z "${RPM_CONFIGDIR:-}" ]]; then
+    if [[ "${REQUIRE_RPM:-0}" == "1" ]]; then
+      echo "error: cannot find rpmrc (set RPM_CONFIGDIR to .../usr/lib/rpm)" >&2
+      exit 1
+    fi
+    echo "warning: cannot find rpmrc — skipping .rpm (deb is ready)." >&2
+    RPM_BASENAME="(skipped)"
+  else
+    RPM_TOP="${WORKDIR}/rpmbuild"
+    RPM_STAGE="${WORKDIR}/rpm-root"
+    rm -rf "${RPM_TOP}" "${RPM_STAGE}"
+    mkdir -p \
+      "${RPM_TOP}/BUILD" \
+      "${RPM_TOP}/BUILDROOT" \
+      "${RPM_TOP}/RPMS" \
+      "${RPM_TOP}/SOURCES" \
+      "${RPM_TOP}/SPECS" \
+      "${RPM_TOP}/SRPMS" \
+      "${RPM_STAGE}"
 
-make install DESTDIR="${RPM_STAGE}" PREFIX=/usr \
-  bindir=/usr/bin datadir=/usr/share \
-  applicationsdir=/usr/share/applications \
-  iconsdir=/usr/share/icons/hicolor/256x256/apps \
-  DESKTOP_SHORTCUT=0
+    make install DESTDIR="${RPM_STAGE}" PREFIX=/usr \
+      bindir=/usr/bin datadir=/usr/share \
+      applicationsdir=/usr/share/applications \
+      iconsdir=/usr/share/icons/hicolor/256x256/apps \
+      DESKTOP_SHORTCUT=0
 
-# Tar staged payload for %setup-free binary install
-tar -C "${RPM_STAGE}" -czf "${RPM_TOP}/SOURCES/lumeneh-payload.tar.gz" .
+    tar -C "${RPM_STAGE}" -czf "${RPM_TOP}/SOURCES/lumeneh-payload.tar.gz" .
 
-SPEC="${RPM_TOP}/SPECS/lumeneh-binary.spec"
-cat > "${SPEC}" <<EOF
+    SPEC="${RPM_TOP}/SPECS/lumeneh-binary.spec"
+    cat > "${SPEC}" <<EOF
 Name:           lumeneh
 Version:        ${VERSION}
 Release:        ${PKG_REL}%{?dist}
@@ -165,21 +193,22 @@ tar -C %{buildroot} -xzf %{SOURCE0}
 - Package lumenEh ${VERSION} with application launcher and icon
 EOF
 
-rpmbuild \
-  --define "_topdir ${RPM_TOP}" \
-  --define "_build_id_links none" \
-  -bb "${SPEC}"
+    "${RPMBUILD_BIN}" \
+      --define "_topdir ${RPM_TOP}" \
+      --define "_build_id_links none" \
+      -bb "${SPEC}"
 
-# Prefer the runtime package name without debug suffixes
-RPM_OUT="$(find "${RPM_TOP}/RPMS" -type f -name "lumeneh-${VERSION}-*.rpm" ! -name '*debug*' | head -n1)"
-if [[ -z "${RPM_OUT}" ]]; then
-  echo "error: rpmbuild produced no lumeneh RPM" >&2
-  find "${RPM_TOP}/RPMS" -type f || true
-  exit 1
+    RPM_OUT="$(find "${RPM_TOP}/RPMS" -type f -name "lumeneh-${VERSION}-*.rpm" ! -name '*debug*' | head -n1)"
+    if [[ -z "${RPM_OUT}" ]]; then
+      echo "error: rpmbuild produced no lumeneh RPM" >&2
+      find "${RPM_TOP}/RPMS" -type f || true
+      exit 1
+    fi
+    RPM_BASENAME="$(basename "${RPM_OUT}")"
+    cp -f "${RPM_OUT}" "${RELEASES}/${RPM_BASENAME}"
+    echo "    wrote ${RELEASES}/${RPM_BASENAME}"
+  fi
 fi
-RPM_BASENAME="$(basename "${RPM_OUT}")"
-cp -f "${RPM_OUT}" "${RELEASES}/${RPM_BASENAME}"
-echo "    wrote ${RELEASES}/${RPM_BASENAME}"
 
 # Manifest for humans / CI
 {
